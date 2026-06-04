@@ -1,0 +1,129 @@
+# Full example ServiceBundle. Demonstrates every pipeline step kind, renderer
+# type and credential source the framework currently recognises.
+meta:
+  name: postgresql
+  author: vshn
+  version: 0.1.0
+  stdlib: ghcr.io/vshn/servicebundle-stdlib:v0.1.0
+
+claim:
+  kind: VSHNPostgreSQL
+  shortNames: [vpg]
+  # serviceSchemaSimple uses kro SimpleSchema syntax. It is expanded into a
+  # full OpenAPI v3 schema and merged into the XRD under spec.parameters.service.
+  simpleSchema:
+    majorVersion: string | enum="15,16,17" default="16" description="PostgreSQL major version. Maps to chart version.postgresql."
+    database: string | default="app" description="Initial database name (bootstrap.initdb.database)."
+    user: string | default="appuser" description="Initial database owner (bootstrap.initdb.owner)."
+
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
+  chart: cluster
+  version: 0.4.0
+  values:
+    fullnameOverride: pg
+    cluster:
+      instances: 1
+      storage:
+        size: 1Gi
+  valueMapping:
+    - claimPath: .spec.parameters.size.replicas
+      target: .spec.cluster.instances
+    - claimPath: .spec.parameters.size.disk
+      target: .spec.cluster.storage.size
+
+pipeline:
+  - kind: provisioning
+
+  - kind: networking
+    tls:
+      enabled: true
+      secretName: pg-tls
+      dnsNames:
+        - "{{ $xr.metadata.name }}.{{ $xr.metadata.namespace }}.svc.cluster.local"
+
+  - kind: backup
+
+  - kind: monitoring
+    alerts:
+      - name: PostgresqlDown
+        expr: cnpg_collector_up{namespace="{{ $xr.metadata.namespace }}"} == 0
+        for: 5m
+        severity: critical
+        summary: PostgreSQL instance down
+        description: "{{ $labels.pod }} has been down for more than 5 minutes."
+        runbookURL: https://kb.vshn.ch/runbooks/postgresql-down
+      - name: PostgresqlHighConnections
+        expr: cnpg_backends_total{namespace="{{ $xr.metadata.namespace }}"} > 80
+        for: 10m
+        severity: warning
+        summary: High connection count
+
+  - kind: maintenance
+    defaultSchedule: "0 3 * * *"
+    envFromClaim:
+      INSTANCE_NAME:
+        claimPath: .metadata.name
+      INSTANCE_NAMESPACE:
+        claimPath: .metadata.namespace
+        default: default
+    tasks:
+      - type: default
+        name: patching-image
+      - type: custom
+        name: vacuum-full
+        schedule: "0 4 * * 0"
+        source: ghcr.io/vshn/pg-vacuum:v1.2.0
+        params:
+          analyze: true
+
+  - kind: custom
+    function: ghcr.io/crossplane-contrib/function-python:v0.4.0
+    input:
+      apiVersion: python.fn.crossplane.io/v1beta1
+      kind: Script
+      script: |
+        from crossplane.function.proto.v1 import run_function_pb2 as fnv1
+
+        def compose(req, rsp):
+            rsp.desired.composite.resource.update({"status": {"ready": True}})
+
+credentials:
+  valueMapping:
+    POSTGRESQL_USER:
+      source: const
+      value: app
+    POSTGRESQL_HOST:
+      source: template
+      value: "{{ $xr.metadata.name }}-rw.{{ $xr.metadata.namespace }}.svc.cluster.local"
+    POSTGRESQL_DB:
+      source: claim_param
+      path: .spec.parameters.service.databaseName
+    POSTGRESQL_PASSWORD:
+      source: secret_ref
+      name: pg-app-user
+      key: password
+    POSTGRESQL_PORT:
+      source: expr
+      expression: observed.resources["pg-cluster"].resource.status.port
+    POSTGRESQL_CA_CERT:
+      source: exec
+      pod: "{{ $xr.metadata.name }}-1"
+      container: postgres
+      command: ["cat", "/controller/certificates/server-ca.crt"]
+      parse: raw
+
+plans:
+  small:
+    cpu: "500m"
+    memory: 512Mi
+    disk: 5Gi
+  medium:
+    cpu: "1"
+    memory: 2Gi
+    disk: 20Gi
+  large:
+    cpu: "2"
+    memory: 8Gi
+    disk: 100Gi
