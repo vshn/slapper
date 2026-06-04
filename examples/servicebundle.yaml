@@ -9,23 +9,12 @@ meta:
 claim:
   kind: VSHNPostgreSQL
   shortNames: [vpg]
-  serviceSchema:
-    type: object
-    description: PostgreSQL-specific parameters (database bootstrap + major version).
-    properties:
-      majorVersion:
-        type: string
-        default: "16"
-        enum: ["15", "16", "17"]
-        description: PostgreSQL major version. Maps to chart `version.postgresql`.
-      database:
-        type: string
-        default: app
-        description: Initial database name (bootstrap.initdb.database).
-      user:
-        type: string
-        default: appuser
-        description: Initial database owner (bootstrap.initdb.owner).
+  # serviceSchemaSimple uses kro SimpleSchema syntax. It is expanded into a
+  # full OpenAPI v3 schema and merged into the XRD under spec.parameters.service.
+  simpleSchema:
+    majorVersion: string | enum="15,16,17" default="16" description="PostgreSQL major version. Maps to chart version.postgresql."
+    database: string | default="app" description="Initial database name (bootstrap.initdb.database)."
+    user: string | default="appuser" description="Initial database owner (bootstrap.initdb.owner)."
 
 renderer:
   type: helm

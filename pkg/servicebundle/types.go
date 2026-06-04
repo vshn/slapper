@@ -54,10 +54,9 @@ type Claim struct {
 	// ShortNames is the list of kubectl short names (e.g. ["vpg"]).
 	ShortNames []string `json:"shortNames,omitempty"`
 
-	// ServiceSchema is the service-specific portion of the OpenAPI v3 schema
-	// merged into the XRD under spec.parameters.service. Free-form to allow
-	// the maintainer to express any JSONSchema fragment.
-	ServiceSchema map[string]any `json:"serviceSchema,omitempty"`
+	// SimpleSchema is a kro SimpleSchema fragment. When set, it is
+	// expanded into a full OpenAPI v3.
+	SimpleSchema map[string]any `json:"simpleSchema,omitempty"`
 }
 
 type RendererType string
