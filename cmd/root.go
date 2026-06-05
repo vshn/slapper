@@ -3,12 +3,19 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 )
+
+var verbosity int
+
+func init() {
+	flag := RootCmd.PersistentFlags()
+	flag.IntVarP(&verbosity, "verbosity", "v", 0, "Verbosity level for logging. Lower values produce more detailed logs. Default is 0 (info). See https://pkg.go.dev/log/slog#Level for thresholds.")
+}
 
 var RootCmd = &cobra.Command{
 	Use:   "slap",
@@ -16,6 +23,7 @@ var RootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
+		slog.SetLogLoggerLevel(slog.Level(verbosity))
 	},
 }
 
@@ -30,7 +38,7 @@ func Execute() {
 		}
 	}
 	if err := RootCmd.ExecuteContext(context.Background()); err != nil {
-		fmt.Println(err)
+		slog.Error("encountered an error", "error", err)
 		os.Exit(1)
 	}
 }

@@ -26,6 +26,16 @@ func Get(k servicebundle.PipelineStepKind) (StepRenderer, bool) {
 	return r, ok
 }
 
+// registeredKinds returns all currently registered step kinds. Useful for
+// error/warn messages that need to show maintainers what is available.
+func registeredKinds() []servicebundle.PipelineStepKind {
+	out := make([]servicebundle.PipelineStepKind, 0, len(registry))
+	for k := range registry {
+		out = append(out, k)
+	}
+	return out
+}
+
 // resetRegistry will clear the registry, only used for testing
 func resetRegistry() {
 	registry = map[servicebundle.PipelineStepKind]StepRenderer{}

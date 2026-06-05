@@ -3,13 +3,15 @@ package converter
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+
+	"sigs.k8s.io/yaml"
 
 	"github.com/vshn/slapper/pkg/converter/pipeline"
 	"github.com/vshn/slapper/pkg/converter/xrd"
 	"github.com/vshn/slapper/pkg/servicebundle"
-	"sigs.k8s.io/yaml"
 )
 
 const outputDir = "xpkg"
@@ -26,6 +28,8 @@ func (s *ServiceBundleConverter) Convert() error {
 		return ErrBundleNotLoaded
 	}
 
+	slog.Info("rendering XRD")
+
 	xrd, err := xrd.BuildXRD(s.serviceBundle)
 	if err != nil {
 		return fmt.Errorf("rendering XRD failed: %w", err)
@@ -35,6 +39,8 @@ func (s *ServiceBundleConverter) Convert() error {
 	if err != nil {
 		return err
 	}
+
+	slog.Info("rendering composition")
 
 	comp, err := pipeline.BuildComposition(s.serviceBundle)
 	if err != nil {
@@ -50,6 +56,8 @@ func (s *ServiceBundleConverter) Convert() error {
 }
 
 func writeToFile(rawData map[string]any, filename string) error {
+	slog.Debug("writing file", "filename", filename)
+
 	data, err := yaml.Marshal(rawData)
 	if err != nil {
 		return fmt.Errorf("failed to convert %s to yaml: %w", filename, err)
@@ -61,11 +69,14 @@ func writeToFile(rawData map[string]any, filename string) error {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", filename, err)
 	}
+	slog.Info("wrote output", "path", path, "bytes", len(data))
 	return nil
 }
 
 // LoadBundle will load the bundle into memory from the given path.
 func (s *ServiceBundleConverter) LoadBundle(path string) error {
+	slog.Debug("loading bundle", "path", path)
+
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -77,6 +88,19 @@ func (s *ServiceBundleConverter) LoadBundle(path string) error {
 	}
 
 	s.serviceBundle = sb
+
+	attrs := []any{
+		"name", sb.Meta.Name,
+		"version", sb.Meta.Version,
+		"pipelineSteps", len(sb.Pipeline),
+	}
+	if sb.Claim != nil {
+		attrs = append(attrs, "claimKind", sb.Claim.Kind)
+	}
+	if sb.Renderer != nil {
+		attrs = append(attrs, "rendererType", string(sb.Renderer.Type))
+	}
+	slog.Info("loaded bundle", attrs...)
 
 	return nil
 }

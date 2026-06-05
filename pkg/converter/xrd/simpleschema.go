@@ -3,8 +3,10 @@ package xrd
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/kubernetes-sigs/kro/pkg/simpleschema"
+
 	"github.com/vshn/slapper/pkg/servicebundle"
 )
 
@@ -82,6 +84,7 @@ func buildParameterSchema(sb *servicebundle.ServiceBundle) (map[string]any, erro
 		"description": "Service-specific parameters defined by the service maintainer.",
 	}
 	if sb.Claim != nil && sb.Claim.SimpleSchema != nil {
+		slog.Debug("expanding service simpleSchema", "fields", len(sb.Claim.SimpleSchema))
 		expanded, err := expandSimpleSchema(sb.Claim.SimpleSchema)
 		if err != nil {
 			return nil, err
@@ -92,6 +95,8 @@ func buildParameterSchema(sb *servicebundle.ServiceBundle) (map[string]any, erro
 		if _, ok := serviceSchema["description"]; !ok {
 			serviceSchema["description"] = "Service-specific parameters defined by the service maintainer."
 		}
+	} else {
+		slog.Debug("no service simpleSchema set, using fallback open object")
 	}
 	props["service"] = serviceSchema
 	return full, nil
