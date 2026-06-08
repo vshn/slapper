@@ -119,3 +119,15 @@ func DeriveFunctionName(ref string) string {
 	}
 	return ref
 }
+
+// ResetForTest will reset the registry for testing.
+// DO NOT use for non-testing purpose.
+func ResetForTest() {
+	resetRegistry()
+}
+
+// RegisterDefaultsForTest registers the default stdlib for testing.
+// DO NOT use for non-testing purpose.
+func RegisterDefaultsForTest() {
+	registerDefaults()
+}
