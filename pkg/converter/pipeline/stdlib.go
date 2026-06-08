@@ -83,7 +83,7 @@ func (customRenderer) Render(step servicebundle.PipelineStep) (map[string]any, e
 		return nil, fmt.Errorf("custom step is missing function.name")
 	}
 
-	derived := deriveFunctionName(c.Function.Name)
+	derived := DeriveFunctionName(c.Function.Name)
 	slog.Debug("resolved custom step function",
 		"raw", c.Function.Name,
 		"derived", derived,
@@ -98,12 +98,12 @@ func (customRenderer) Render(step servicebundle.PipelineStep) (map[string]any, e
 	}, nil
 }
 
-// deriveFunctionName turns an OCI image reference into a best-guess Function
+// DeriveFunctionName turns an OCI image reference into a best-guess Function
 // resource name. Strategy: take the last non-empty path segment, then strip
 // any digest (@sha256:...) and tag (:v1.2.3).
 // This is used for custom steps, standard functions will get the
 // correct refs from the stdlib.
-func deriveFunctionName(ref string) string {
+func DeriveFunctionName(ref string) string {
 	ref = strings.TrimRight(ref, "/")
 	if ref == "" {
 		return ""

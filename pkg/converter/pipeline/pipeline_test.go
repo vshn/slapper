@@ -135,7 +135,7 @@ func TestDeriveFunctionName(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, deriveFunctionName(tc.in))
+			assert.Equal(t, tc.want, DeriveFunctionName(tc.in))
 		})
 	}
 }
