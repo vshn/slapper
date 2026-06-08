@@ -1,0 +1,9 @@
+oxr = option("params").oxr
+cm = {
+    apiVersion = "v1"
+    kind = "ConfigMap"
+    metadata.name = "monitoring"
+    metadata.annotations: {"krm.kcl.dev/ready": "True"}
+    data.content = "dummy"
+}
+items = [cm]
