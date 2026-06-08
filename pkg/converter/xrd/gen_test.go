@@ -205,3 +205,95 @@ func TestExampleBundle_BuildsXRD(t *testing.T) {
 		assert.True(t, ok, "service field %q missing after round-trip", k)
 	}
 }
+
+func TestMergeFrameworkFragments_AddsTopLevelKeys(t *testing.T) {
+	xrd := minimalXRD(t) // helper that builds an XRD via BuildXRD for a tiny bundle
+	frags := map[string]any{
+		"size": map[string]any{
+			"type":       "object",
+			"properties": map[string]any{"cpu": map[string]any{"type": "string"}},
+		},
+	}
+	require.NoError(t, MergeFrameworkFragments(xrd, frags))
+
+	props := digParams(t, xrd) // returns spec.versions[0].schema.openAPIV3Schema.properties.spec.parameters.properties
+	assert.Contains(t, props, "size")
+	assert.Equal(t, "object", props["size"].(map[string]any)["type"])
+}
+
+func TestMergeFrameworkFragments_CollisionError(t *testing.T) {
+	// Inject a top-level key directly. We can't rely on the bundle's
+	// SimpleSchema for this — those fields land under
+	// spec.parameters.properties.service.properties, not at the top level
+	// (see xrd/simpleschema.go::buildParameterSchema). Real collisions
+	// can only occur with the framework's own top-level keys
+	// (plan/instances/maintenance/service) or with another stdlib fragment.
+	xrd := xrdWithTopLevelKey(t, "size")
+	frags := map[string]any{"size": map[string]any{"type": "object"}}
+	err := MergeFrameworkFragments(xrd, frags)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "collides with framework fragment")
+	assert.Contains(t, err.Error(), "size")
+}
+
+func TestMergeFrameworkFragments_NilFragments(t *testing.T) {
+	xrd := minimalXRD(t)
+	require.NoError(t, MergeFrameworkFragments(xrd, nil))
+}
+
+func minimalXRD(t *testing.T) *unstructured.Unstructured {
+	t.Helper()
+	sb := &servicebundle.ServiceBundle{
+		Meta:  servicebundle.Meta{Name: "test", Author: "t", Version: "0.0.1"},
+		Claim: &servicebundle.Claim{Kind: "TestThing"},
+	}
+	xrd, err := BuildXRD(sb)
+	require.NoError(t, err)
+	return xrd
+}
+
+// xrdWithTopLevelKey injects a property at
+// spec.parameters.properties[key] directly so a top-level collision can be
+// tested. Bundle SimpleSchema fields land under properties.service, so they
+// cannot produce a top-level collision via BuildXRD alone.
+func xrdWithTopLevelKey(t *testing.T, key string) *unstructured.Unstructured {
+	t.Helper()
+	xrd := minimalXRD(t)
+	props := digParams(t, xrd)
+	props[key] = map[string]any{"type": "string"}
+	return xrd
+}
+
+// digParams returns
+// spec.versions[0].schema.openAPIV3Schema.properties.spec.parameters.properties.
+// Uses unstructured.NestedFieldNoCopy so mutations to the returned map
+// propagate back into xrd.Object. (NestedSlice / NestedMap deep-copy and
+// would break the helper's mutator contract.)
+func digParams(t *testing.T, xrd *unstructured.Unstructured) map[string]any {
+	t.Helper()
+
+	raw, found, err := unstructured.NestedFieldNoCopy(xrd.Object, "spec", "versions")
+	require.NoError(t, err)
+	require.True(t, found)
+	versions, ok := raw.([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, versions)
+
+	v0, ok := versions[0].(map[string]any)
+	require.True(t, ok)
+
+	params, found, err := unstructured.NestedFieldNoCopy(v0,
+		"schema", "openAPIV3Schema",
+		"properties", "spec",
+		"properties", "parameters")
+	require.NoError(t, err)
+	require.True(t, found)
+	paramsMap := params.(map[string]any)
+
+	props, _ := paramsMap["properties"].(map[string]any)
+	if props == nil {
+		props = map[string]any{}
+		paramsMap["properties"] = props
+	}
+	return props
+}

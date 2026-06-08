@@ -84,3 +84,51 @@ func BuildXRD(sb *servicebundle.ServiceBundle) (*unstructured.Unstructured, erro
 
 	return xrd, nil
 }
+
+func MergeFrameworkFragments(xrd *unstructured.Unstructured, fragments map[string]any) error {
+	if fragments == nil {
+		return nil
+	}
+
+	raw, _, err := unstructured.NestedFieldNoCopy(xrd.Object, "spec", "versions")
+	if err != nil {
+		fmt.Errorf("xrd cannot get version: %w", err)
+	}
+
+	versions, ok := raw.([]any)
+	if !ok {
+		fmt.Errorf("xrd versions: %w", err)
+	}
+
+	// Crossplane doesn't really support multiple versions at the moment...
+	v0, ok := versions[0].(map[string]any)
+	if !ok {
+		fmt.Errorf("xrd version invalid: %w", err)
+	}
+
+	raw, found, err := unstructured.NestedFieldNoCopy(v0,
+		"schema", "openAPIV3Schema",
+		"properties", "spec",
+		"properties", "parameters", "properties")
+
+	props, ok := raw.(map[string]any)
+	if !ok {
+		fmt.Errorf("spec properties not valid")
+	}
+
+	if !found {
+		props = map[string]any{}
+	}
+
+	for k, v := range fragments {
+		_, ok := props[k]
+		if ok {
+			return fmt.Errorf("service schema field %s collides with framework fragment", k)
+		}
+
+		props[k] = v
+	}
+
+	return unstructured.SetNestedField(v0, props, "schema", "openAPIV3Schema", "properties", "spec", "properties",
+		"parameters", "properties")
+}
