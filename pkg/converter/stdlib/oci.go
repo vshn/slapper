@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -40,6 +41,12 @@ func loadOCI(ctx context.Context, src OCISource) (*Manifest, fs.FS, error) {
 	if err == nil {
 		cacheDir := filepath.Join(cacheDir, d.String())
 		if isPopulated(cacheDir) {
+			slog.Info("stdlib resolved",
+				"source", "oci",
+				"ref", src.Ref,
+				"digest", d.String(),
+				"cachedHit", true,
+			)
 			return loadLocal(cacheDir)
 		}
 	}
@@ -84,6 +91,12 @@ func loadOCI(ctx context.Context, src OCISource) (*Manifest, fs.FS, error) {
 		return nil, nil, fmt.Errorf("rename image cache %s: %w", cacheDir, err)
 	}
 
+	slog.Info("stdlib resolved",
+		"source", "oci",
+		"ref", src.Ref,
+		"digest", dgst.Digest.String(),
+		"cachedHit", false,
+	)
 	return loadLocal(cacheDir)
 }
 

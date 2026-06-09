@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"sigs.k8s.io/yaml"
 
@@ -38,7 +39,6 @@ func (s *ServiceBundleConverter) Convert() error {
 
 	var xrdFragments map[string]any
 	if s.StdlibSource != nil {
-		slog.Info("loading stdlib", "source", s.StdlibSource)
 		// TODO: can we get a context from cobra?
 		m, files, err := stdlib.Load(context.Background(), s.StdlibSource)
 		if err != nil {
@@ -50,7 +50,6 @@ func (s *ServiceBundleConverter) Convert() error {
 			return fmt.Errorf("registering stdlib: %w", err)
 		}
 
-		slog.Info("rendering dependencies")
 		deps, err := stdlib.BuildDependencies(m, s.serviceBundle.Pipeline)
 		if err != nil {
 			return fmt.Errorf("parsing dependencies: %w", err)
@@ -66,7 +65,11 @@ func (s *ServiceBundleConverter) Convert() error {
 			return err
 		}
 
-		slog.Info("decoding xrd fragments from the stdlib")
+		functions := make([]string, 0, len(deps))
+		for _, d := range deps {
+			functions = append(functions, d.Function)
+		}
+		slog.Info("xpkg dependencies emitted", "count", len(deps), "functions", functions)
 
 		xrdFrags, err := decodeFragments(m, files)
 		if err != nil {
@@ -89,6 +92,12 @@ func (s *ServiceBundleConverter) Convert() error {
 		if err != nil {
 			return err
 		}
+		keys := make([]string, 0, len(xrdFragments))
+		for k := range xrdFragments {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		slog.Info("stdlib schema fragments merged", "keys", keys)
 	}
 
 	err = writeToFile(xrdObj.Object, "xrd", s.OutputDir)
