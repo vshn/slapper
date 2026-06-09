@@ -27,8 +27,19 @@ type ServiceBundleConverter struct {
 	OutputDir     string
 }
 
-// Convert converts the loaded bundle into a Crossplane package
-func (s *ServiceBundleConverter) Convert() error {
+// Meta returns the loaded bundle's meta block. Returns zero value if no
+// bundle has been loaded yet -> callers should LoadBundle first.
+func (s *ServiceBundleConverter) Meta() servicebundle.Meta {
+	if s.serviceBundle == nil {
+		return servicebundle.Meta{}
+	}
+	return s.serviceBundle.Meta
+}
+
+// Convert converts the loaded bundle into a Crossplane package. The context
+// is forwarded to the stdlib loader so OCI pulls honour cancellation /
+// deadlines from the caller (e.g. cobra's cmd.Context()).
+func (s *ServiceBundleConverter) Convert(ctx context.Context) error {
 	if s.OutputDir == "" {
 		s.OutputDir = "xpkg"
 	}
@@ -39,8 +50,7 @@ func (s *ServiceBundleConverter) Convert() error {
 
 	var xrdFragments map[string]any
 	if s.StdlibSource != nil {
-		// TODO: can we get a context from cobra?
-		m, files, err := stdlib.Load(context.Background(), s.StdlibSource)
+		m, files, err := stdlib.Load(ctx, s.StdlibSource)
 		if err != nil {
 			return fmt.Errorf("loading stdlib: %w", err)
 		}

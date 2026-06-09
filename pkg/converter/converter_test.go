@@ -1,6 +1,7 @@
 package converter
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,7 +56,7 @@ pipeline:
 
 func TestConvert_NoBundleLoaded(t *testing.T) {
 	c := ServiceBundleConverter{}
-	err := c.Convert()
+	err := c.Convert(context.Background())
 	require.ErrorIs(t, err, ErrBundleNotLoaded)
 }
 
@@ -98,7 +99,7 @@ func TestConvert_E2E_CreatesOutputDirAndFiles(t *testing.T) {
 
 	c := ServiceBundleConverter{}
 	require.NoError(t, c.LoadBundle(bundlePath))
-	require.NoError(t, c.Convert())
+	require.NoError(t, c.Convert(context.Background()))
 
 	for _, f := range []string{"xrd.yaml", "composition.yaml"} {
 		path := filepath.Join(dir, "xpkg", f)
@@ -128,7 +129,7 @@ pipeline:
 
 	c := ServiceBundleConverter{}
 	require.NoError(t, c.LoadBundle(path))
-	err := c.Convert()
+	err := c.Convert(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "rendering XRD failed")
 }
@@ -151,7 +152,7 @@ claim:
 
 	c := ServiceBundleConverter{}
 	require.NoError(t, c.LoadBundle(path))
-	err := c.Convert()
+	err := c.Convert(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "rendering Composition failed")
 }
@@ -177,7 +178,7 @@ func TestServiceBundleConverter_Convert_WithLocalStdlib(t *testing.T) {
 		OutputDir:    filepath.Join(dir, "out"),
 	}
 	require.NoError(t, c.LoadBundle(bundlePath))
-	require.NoError(t, c.Convert())
+	require.NoError(t, c.Convert(context.Background()))
 
 	// Composition: every step should now use function-kcl with the stdlib KCL body, not the in-tree dummy.
 	compRaw, err := os.ReadFile(filepath.Join(dir, "out", "composition.yaml"))

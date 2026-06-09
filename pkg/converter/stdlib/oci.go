@@ -33,21 +33,21 @@ func loadOCI(ctx context.Context, src OCISource) (*Manifest, fs.FS, error) {
 		return nil, nil, fmt.Errorf("invalid stdlib reference: %w", err)
 	}
 
-	cacheDir := filepath.Join(src.CacheDir, ref.Registry, ref.Repository)
+	repoCacheRoot := filepath.Join(src.CacheDir, ref.Registry, ref.Repository)
 
-	// if there's a digest and we have it locally,
-	// we can skip the registry
-	d, err := digest.Parse(ref.Reference)
-	if err == nil {
-		cacheDir := filepath.Join(cacheDir, d.String())
-		if isPopulated(cacheDir) {
-			slog.Info("stdlib resolved",
+	// If the ref carries a digest and the digest-keyed cache is populated,
+	// short-circuit the network. Tag-only refs always Resolve.
+	if d, err := digest.Parse(ref.Reference); err == nil {
+		cached := filepath.Join(repoCacheRoot, d.String())
+		if isPopulated(cached) {
+			slog.Info(
+				"stdlib resolved",
 				"source", "oci",
 				"ref", src.Ref,
 				"digest", d.String(),
 				"cachedHit", true,
 			)
-			return loadLocal(cacheDir)
+			return loadLocal(cached)
 		}
 	}
 
@@ -63,20 +63,50 @@ func loadOCI(ctx context.Context, src OCISource) (*Manifest, fs.FS, error) {
 		return nil, nil, fmt.Errorf("image descriptor: %w", err)
 	}
 
-	cacheDir = filepath.Join(cacheDir, dgst.Digest.String())
+	cacheDir := filepath.Join(repoCacheRoot, dgst.Digest.String())
 
-	tmp, err := os.MkdirTemp("", "slapper-stdlib-*")
+	// skip pulling again, if the digest is already present
+	// in the cache
+	if isPopulated(cacheDir) {
+		slog.Info(
+			"stdlib resolved",
+			"source", "oci",
+			"ref", src.Ref,
+			"digest", dgst.Digest.String(),
+			"cachedHit", true,
+		)
+		return loadLocal(cacheDir)
+	}
+
+	if err := os.MkdirAll(repoCacheRoot, 0o755); err != nil {
+		return nil, nil, fmt.Errorf("create cache root: %w", err)
+	}
+	tmp, err := os.MkdirTemp(repoCacheRoot, ".slapper-stdlib-*")
 	if err != nil {
 		return nil, nil, fmt.Errorf("cache tmp dir: %w", err)
 	}
 
-	defer os.RemoveAll(tmp)
+	defer func() {
+		err := os.RemoveAll(tmp)
+		if err != nil {
+			slog.Error("removing tmp dir", "error", err)
+		}
+	}()
 
+	// file.new has a 32Mb limit as of oras 2.6.1
+	// since stdlibs are mostly some yamls, this should be
+	// plenty.
 	store, err := file.New(tmp)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cache tmp store: %w", err)
 	}
-	defer store.Close()
+
+	defer func() {
+		err := store.Close()
+		if err != nil {
+			slog.Error("closing filestore", "error", err)
+		}
+	}()
 
 	_, err = oras.Copy(ctx, repo, ref.Reference, store, ref.ReferenceOrDefault(), oras.DefaultCopyOptions)
 	if err != nil {
@@ -84,14 +114,15 @@ func loadOCI(ctx context.Context, src OCISource) (*Manifest, fs.FS, error) {
 	}
 
 	if err := os.MkdirAll(filepath.Dir(cacheDir), 0o755); err != nil {
-		return nil, nil, fmt.Errorf("create image cache %s; %w", tmp, err)
+		return nil, nil, fmt.Errorf("create image cache %s: %w", cacheDir, err)
 	}
 
 	if err := os.Rename(tmp, cacheDir); err != nil && !errors.Is(err, fs.ErrExist) {
 		return nil, nil, fmt.Errorf("rename image cache %s: %w", cacheDir, err)
 	}
 
-	slog.Info("stdlib resolved",
+	slog.Info(
+		"stdlib resolved",
 		"source", "oci",
 		"ref", src.Ref,
 		"digest", dgst.Digest.String(),
@@ -101,13 +132,13 @@ func loadOCI(ctx context.Context, src OCISource) (*Manifest, fs.FS, error) {
 }
 
 func isPopulated(cacheDir string) bool {
-	_, err := os.Stat(cacheDir + "/" + manifestFile)
+	_, err := os.Stat(filepath.Join(cacheDir, manifestFile))
 	return !errors.Is(err, os.ErrNotExist)
 }
 
-// DefaultCacheDir gets the defaul cache dir for
-// the current user/os
-// TODO: wire in
+// DefaultCacheDir returns the default cache root for OCI-pulled stdlib
+// artifacts: <user-cache>/slapper/stdlib. Wired in as the default for the
+// CLI's --stdlib-cache-dir flag.
 func DefaultCacheDir() string {
 	h, _ := os.UserCacheDir()
 	return filepath.Join(h, "slapper", "stdlib")

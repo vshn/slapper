@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/fs"
 
+	"sigs.k8s.io/yaml"
+
 	"github.com/vshn/slapper/pkg/converter/pipeline"
 	"github.com/vshn/slapper/pkg/servicebundle"
 )
@@ -25,16 +27,23 @@ func (s *stdlibRenderer) Kind() servicebundle.PipelineStepKind {
 	return s.entry.Kind
 }
 
-// Render renders the step entry
+// Render renders the step entry. The input file is YAML-decoded into a
+// structured map so the resulting composition embeds the function input as
+// a nested object (what Crossplane's runtime expects), not a raw string.
 func (s *stdlibRenderer) Render(_ servicebundle.PipelineStep) (map[string]any, error) {
 	rawInput, err := fs.ReadFile(s.files, s.entry.InputFile)
 	if err != nil {
 		return nil, fmt.Errorf("input file: %w", err)
 	}
 
+	var parsed map[string]any
+	if err := yaml.Unmarshal(rawInput, &parsed); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", s.entry.InputFile, err)
+	}
+
 	return map[string]any{
 		"step":        string(s.entry.Kind),
 		"functionRef": map[string]any{"name": pipeline.DeriveFunctionName(s.entry.Function.Name)},
-		"input":       string(rawInput),
+		"input":       parsed,
 	}, nil
 }

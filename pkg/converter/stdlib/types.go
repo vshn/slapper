@@ -69,5 +69,11 @@ func (m *Manifest) Validate() error {
 		seen[step.Kind] = true
 	}
 
+	for _, step := range m.Steps {
+		if step.Function.Name == "" {
+			return fmt.Errorf("step %s: function.name is required", step.Kind)
+		}
+	}
+
 	return nil
 }

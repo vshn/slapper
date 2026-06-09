@@ -33,12 +33,15 @@ pipeline:
 	return path
 }
 
+// minimalBundle omits meta.stdlib so the CLI's stdlib-resolution
+// short-circuits (no flag + no meta.stdlib → nil source). Tests that need
+// stdlib behavior set the field explicitly via writeBundleWithStdlibRef.
 const minimalBundle = `
 meta:
   name: pg
   author: vshn
   version: 0.1.0
-  stdlib: ghcr.io/vshn/stdlib
+  stdlib: ""
 claim:
   kind: Foo
 pipeline:

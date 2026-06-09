@@ -7,11 +7,7 @@ import (
 	"log/slog"
 )
 
-const (
-	constLocalSource = "LocalSource"
-	constOCISource   = "OCISource"
-	manifestFile     = "stdlib.yaml"
-)
+const manifestFile = "stdlib.yaml"
 
 // Source identifies where to load the stdlib from.
 type Source interface {

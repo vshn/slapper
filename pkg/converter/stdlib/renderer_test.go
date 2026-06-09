@@ -31,13 +31,14 @@ func TestStdlibRenderer_Render(t *testing.T) {
 	fnRef, ok := out["functionRef"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "function-kcl", fnRef["name"])
-	input, ok := out["input"].(string)
+	input, ok := out["input"].(map[string]any)
 	require.True(t, ok)
-	assert.NotEmpty(t, input)
+	assert.Equal(t, "krm.kcl.dev/v1alpha1", input["apiVersion"])
+	assert.Equal(t, "KCLInput", input["kind"])
 }
 
 func TestStdlibRenderer_Render_BadYAML(t *testing.T) {
-	files := fstest.MapFS{"notbad.kcl": &fstest.MapFile{Data: []byte("not: : valid")}}
+	files := fstest.MapFS{"bad.kcl": &fstest.MapFile{Data: []byte("not: : valid")}}
 	entry := StepEntry{
 		Kind:      servicebundle.StepProvisioning,
 		Function:  FunctionRef{Name: "function-kcl"},
