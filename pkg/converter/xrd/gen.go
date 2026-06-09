@@ -37,6 +37,9 @@ func BuildXRD(sb *servicebundle.ServiceBundle) (*unstructured.Unstructured, erro
 		"appslap.io/maintainer":    sb.Meta.Author,
 	})
 
+	// we're using unstructured.unstructured, because
+	// Crossplane's upstream XRD struct also just
+	// contains a raw map[string]any for openAPIV3Schema
 	xrd.Object["spec"] = map[string]any{
 		"scope": "Namespaced",
 		"group": xpconst.Group,
