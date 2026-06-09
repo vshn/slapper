@@ -24,24 +24,13 @@ func (l LocalSource) source() string {
 	return "local:" + string(l)
 }
 
-// OCISource pulls from an OCI registry, caching by digest.
-type OCISource struct {
-	Ref       string
-	CacheDir  string
-	PlainHTTP bool
-}
-
-func (o OCISource) source() string {
-	return "oci:" + o.Ref
-}
-
 // Load loads the stdlib according to the source
 func Load(ctx context.Context, src Source) (*Manifest, fs.FS, error) {
 	switch s := src.(type) {
 	case LocalSource:
 		return loadLocal(string(s))
 	case OCISource:
-		// return loadOCI(ctx, s)
+		return loadOCI(ctx, s)
 	case nil:
 		return nil, nil, fmt.Errorf("nil stdlib source")
 	default:

@@ -35,6 +35,8 @@ func BuildDependencies(m *Manifest, used []servicebundle.PipelineStep) ([]Depend
 			}
 			name = cs.Function.Name
 			constraint = cs.Function.VersionConstraint
+		// TODO: might need later reworking to allow
+		// injecting additional steps from the stdlib
 		default:
 			entry, ok := byKind[step.Kind]
 			if !ok {
