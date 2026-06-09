@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,6 +9,29 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// writeBundleWithStdlibRef writes a minimal-but-convertible ServiceBundle
+// whose meta.stdlib points at the given OCI ref, then returns the bundle
+// path. Used by --no-stdlib warn-path tests: the bundle declares a stdlib
+// reference, the CLI flag suppresses resolution, conversion must still
+// succeed via the in-tree dummy renderers.
+func writeBundleWithStdlibRef(t *testing.T, dir, ref string) string {
+	t.Helper()
+	body := fmt.Sprintf(`
+meta:
+  name: pg
+  author: vshn
+  version: 0.1.0
+  stdlib: %s
+claim:
+  kind: Foo
+pipeline:
+  - kind: provisioning
+`, ref)
+	path := filepath.Join(dir, "bundle.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o644))
+	return path
+}
 
 const minimalBundle = `
 meta:
@@ -22,13 +46,17 @@ pipeline:
 `
 
 func TestConvert_NoArgs(t *testing.T) {
-	err := convert(convertCmd, nil)
+	root := newRootCmd()
+	root.SetArgs([]string{"convert"})
+	err := root.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no file path provided")
 }
 
 func TestConvert_LoadFailure(t *testing.T) {
-	err := convert(convertCmd, []string{filepath.Join(t.TempDir(), "missing.yaml")})
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", filepath.Join(t.TempDir(), "missing.yaml")})
+	err := root.Execute()
 	require.Error(t, err)
 }
 
@@ -39,10 +67,42 @@ func TestConvert_E2E(t *testing.T) {
 	bundlePath := filepath.Join(dir, "bundle.yaml")
 	require.NoError(t, os.WriteFile(bundlePath, []byte(minimalBundle), 0o644))
 
-	require.NoError(t, convert(convertCmd, []string{bundlePath}))
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", bundlePath})
+	require.NoError(t, root.Execute())
 
 	for _, f := range []string{"xrd.yaml", "composition.yaml"} {
 		_, err := os.Stat(filepath.Join(dir, "xpkg", f))
 		require.NoError(t, err, "expected %s", f)
 	}
+}
+
+func TestConvert_FlagsMutuallyExclusive(t *testing.T) {
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", "--stdlib-path", "/tmp/x", "--no-stdlib", "bundle.yaml"})
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestConvert_StdlibPath_NonexistentDir(t *testing.T) {
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", "--stdlib-path", "/does/not/exist", "bundle.yaml"})
+	err := root.Execute()
+	require.Error(t, err)
+}
+
+func TestConvert_NoStdlibWithMetaSet_Warn(t *testing.T) {
+	// Write minimal bundle with Meta.Stdlib set; run with --no-stdlib.
+	// Assert exit succeeds (warn only). Compositions emitted with in-tree dummies.
+	dir := t.TempDir()
+	bundlePath := writeBundleWithStdlibRef(t, dir, "ghcr.io/fake/stdlib:v0")
+	out := filepath.Join(dir, "out")
+
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", "--no-stdlib", "--output", out, bundlePath})
+	require.NoError(t, root.Execute())
+
+	_, err := os.Stat(filepath.Join(out, "composition.yaml"))
+	require.NoError(t, err)
 }
