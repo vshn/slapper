@@ -1,0 +1,25 @@
+# Example XR (Crossplane v2 namespaced composite) that triggers the
+# Composition generated from examples/servicebundle.yaml.
+#
+# Apply with:
+#   kubectl apply -f examples/xvshnpostgresql.yaml
+#
+# Requires the generated XRD + Composition to be installed first:
+#   slap convert examples/servicebundle.yaml
+#   kubectl apply -f xpkg/xrd.yaml
+#   kubectl apply -f xpkg/composition.yaml
+apiVersion: appslap.io/v1alpha1
+kind: XVSHNPostgreSQL
+metadata:
+  name: my-pg
+  namespace: default
+spec:
+  parameters:
+    plan: small
+    instances: 1
+    maintenance:
+      schedule: "0 3 * * 0"
+    service:
+      majorVersion: "16"
+      database: app
+      user: appuser

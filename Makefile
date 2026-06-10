@@ -40,7 +40,8 @@ lint: fmt vet generate ## All-in-one linting
 	git diff --exit-code
 
 clean: ## Cleans up the generated resources
-	rm -rf cover.out $(BIN_FILENAME) ||:
+	rm -rf cover.out $(BIN_FILENAME)
+	find xpkg -mindepth 1 -not -name .gitignore -delete 2>/dev/null ||:
 
 .PHONY: run
 run: build ## Runs the slapper (use ARGS="...")

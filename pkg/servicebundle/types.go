@@ -3,13 +3,16 @@ package servicebundle
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"github.com/gobuffalo/flect"
 )
 
 // ServiceBundle is the maintainer-facing contract.
 type ServiceBundle struct {
 	// Meta contains meta information about this service bundle.
 	// Information like the name, version, author and the stdlib repo.
-	Meta Meta `json:"meta,omitempty"`
+	Meta Meta `json:"meta"`
 
 	// Claim declares the user-facing XRD / claim API: kind, shortNames and the
 	// service-specific portion of the OpenAPI schema. Framework-wide fields
@@ -57,6 +60,21 @@ type Claim struct {
 	// SimpleSchema is a kro SimpleSchema fragment. When set, it is
 	// expanded into a full OpenAPI v3.
 	SimpleSchema map[string]any `json:"simpleSchema,omitempty"`
+}
+
+// XKind returns the composite kind of this claim
+func (c *Claim) XKind() string {
+	return "X" + c.Kind
+}
+
+// XPlu returns the plural kind of this composite
+func (c *Claim) XPlu() string {
+	return flect.Pluralize(strings.ToLower(c.XKind()))
+}
+
+// XSing returns the singular kind of this composite
+func (c *Claim) XSing() string {
+	return flect.Singularize(strings.ToLower(c.XKind()))
 }
 
 type RendererType string
@@ -214,8 +232,15 @@ func (MaintenanceStep) StepKind() PipelineStepKind { return StepMaintenance }
 
 // CustomStep wraps an arbitrary Crossplane function. Input is passed verbatim.
 type CustomStep struct {
-	Function string         `json:"function"`
+	Function FuncRef        `json:"function"`
 	Input    map[string]any `json:"input,omitempty"`
+}
+
+type FuncRef struct {
+	Name string `json:"name"`
+	// VersionConstraint is a Crossplane version constraint for the given
+	// function. It will be put into the xpkg as is.
+	VersionConstraint string `json:"versionConstraint,omitempty"`
 }
 
 func (CustomStep) StepKind() PipelineStepKind { return StepCustom }

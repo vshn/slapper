@@ -9,7 +9,7 @@ meta:
 claim:
   kind: VSHNPostgreSQL
   shortNames: [vpg]
-  # serviceSchemaSimple uses kro SimpleSchema syntax. It is expanded into a
+  # simpleSchema uses kro SimpleSchema syntax. It is expanded into a
   # full OpenAPI v3 schema and merged into the XRD under spec.parameters.service.
   simpleSchema:
     majorVersion: string | enum="15,16,17" default="16" description="PostgreSQL major version. Maps to chart version.postgresql."
@@ -79,7 +79,9 @@ pipeline:
           analyze: true
 
   - kind: custom
-    function: ghcr.io/crossplane-contrib/function-python:v0.4.0
+    function:
+      name: ghcr.io/crossplane-contrib/function-python
+      versionConstraint: v0.4.0
     input:
       apiVersion: python.fn.crossplane.io/v1beta1
       kind: Script

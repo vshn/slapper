@@ -2,10 +2,10 @@ package servicebundle
 
 import (
 	"os"
-	"reflect"
-	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 )
 
@@ -15,20 +15,14 @@ import (
 func roundTrip[T any](t *testing.T, raw string) T {
 	t.Helper()
 	var first T
-	if err := yaml.Unmarshal([]byte(raw), &first); err != nil {
-		t.Fatalf("first unmarshal: %v", err)
-	}
+	require.NoError(t, yaml.Unmarshal([]byte(raw), &first), "first unmarshal")
+
 	out, err := yaml.Marshal(first)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
+	require.NoError(t, err, "marshal")
+
 	var second T
-	if err := yaml.Unmarshal(out, &second); err != nil {
-		t.Fatalf("second unmarshal of %s: %v", out, err)
-	}
-	if !reflect.DeepEqual(first, second) {
-		t.Fatalf("round-trip mismatch:\n first  = %#v\n second = %#v\n second YAML = %s", first, second, out)
-	}
+	require.NoError(t, yaml.Unmarshal(out, &second), "second unmarshal of %s", out)
+	require.Equal(t, first, second, "round-trip mismatch; second YAML = %s", out)
 	return first
 }
 
@@ -44,9 +38,8 @@ func TestPipelineStep_RoundTrip(t *testing.T) {
 			yaml:     `kind: provisioning`,
 			wantKind: StepProvisioning,
 			check: func(t *testing.T, spec StepSpec) {
-				if _, ok := spec.(*ProvisioningStep); !ok {
-					t.Fatalf("got %T", spec)
-				}
+				_, ok := spec.(*ProvisioningStep)
+				assert.True(t, ok, "got %T", spec)
 			},
 		},
 		{
@@ -62,9 +55,9 @@ tls:
 			wantKind: StepNetworking,
 			check: func(t *testing.T, spec StepSpec) {
 				n := spec.(*NetworkingStep)
-				if n.TLS == nil || !n.TLS.Enabled || n.TLS.SecretName != "my-tls" {
-					t.Fatalf("bad TLS: %+v", n.TLS)
-				}
+				require.NotNil(t, n.TLS, "TLS nil")
+				assert.True(t, n.TLS.Enabled)
+				assert.Equal(t, "my-tls", n.TLS.SecretName)
 			},
 		},
 		{
@@ -78,9 +71,8 @@ alerts:
 			wantKind: StepMonitoring,
 			check: func(t *testing.T, spec StepSpec) {
 				m := spec.(*MonitoringStep)
-				if len(m.Alerts) != 1 || m.Alerts[0].Name != "HighCPU" {
-					t.Fatalf("bad alerts: %+v", m.Alerts)
-				}
+				require.Len(t, m.Alerts, 1)
+				assert.Equal(t, "HighCPU", m.Alerts[0].Name)
 			},
 		},
 		{
@@ -95,16 +87,17 @@ tasks:
 			wantKind: StepMaintenance,
 			check: func(t *testing.T, spec StepSpec) {
 				m := spec.(*MaintenanceStep)
-				if m.DefaultSchedule != "0 3 * * *" || len(m.Tasks) != 1 {
-					t.Fatalf("bad maintenance: %+v", m)
-				}
+				assert.Equal(t, "0 3 * * *", m.DefaultSchedule)
+				assert.Len(t, m.Tasks, 1)
 			},
 		},
 		{
 			name: "custom",
 			yaml: `
 kind: custom
-function: ghcr.io/foo/bar:v1
+function:
+  name: ghcr.io/foo/bar
+  versionConstraint: v1
 input:
   apiVersion: x/v1
   kind: Script
@@ -114,12 +107,9 @@ input:
 			wantKind: StepCustom,
 			check: func(t *testing.T, spec StepSpec) {
 				c := spec.(*CustomStep)
-				if c.Function != "ghcr.io/foo/bar:v1" {
-					t.Fatalf("bad function: %q", c.Function)
-				}
-				if c.Input["kind"] != "Script" {
-					t.Fatalf("input not preserved: %+v", c.Input)
-				}
+				assert.Equal(t, "ghcr.io/foo/bar", c.Function.Name)
+				assert.Equal(t, "v1", c.Function.VersionConstraint)
+				assert.Equal(t, "Script", c.Input["kind"], "input not preserved")
 			},
 		},
 	}
@@ -127,9 +117,7 @@ input:
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			step := roundTrip[PipelineStep](t, tc.yaml)
-			if step.Kind != tc.wantKind {
-				t.Fatalf("kind: got %q want %q", step.Kind, tc.wantKind)
-			}
+			require.Equal(t, tc.wantKind, step.Kind)
 			tc.check(t, step.Spec)
 		})
 	}
@@ -138,17 +126,15 @@ input:
 func TestPipelineStep_UnknownKind(t *testing.T) {
 	var s PipelineStep
 	err := yaml.Unmarshal([]byte(`kind: made-up`), &s)
-	if err == nil || !strings.Contains(err.Error(), `unknown kind made-up`) {
-		t.Fatalf("want unknown-kind error, got %v", err)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown kind made-up")
 }
 
 func TestPipelineStep_MissingKind(t *testing.T) {
 	var s PipelineStep
 	err := yaml.Unmarshal([]byte(`function: foo`), &s)
-	if err == nil || !strings.Contains(err.Error(), `missing "kind"`) {
-		t.Fatalf("want missing-kind error, got %v", err)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `missing "kind"`)
 }
 
 func TestRenderer_Helm(t *testing.T) {
@@ -164,19 +150,16 @@ valueMapping:
     target: .spec.replicas
 `
 	r := roundTrip[Renderer](t, in)
-	if r.Type != RendererTypeHelm {
-		t.Fatalf("type: %q", r.Type)
-	}
+	require.Equal(t, RendererTypeHelm, r.Type)
+
 	h := r.Spec.(*HelmSource)
-	if h.Repository != "https://charts.example/" || h.Chart != "my-chart" || h.Version != "1.2.3" {
-		t.Fatalf("bad helm: %+v", h)
-	}
-	if got, ok := h.Values["replicaCount"]; !ok || got != float64(3) {
-		t.Fatalf("values not preserved: %+v", h.Values)
-	}
-	if len(r.ValueMapping) != 1 || r.ValueMapping[0].ClaimPath != ".spec.size" {
-		t.Fatalf("bad valueMapping: %+v", r.ValueMapping)
-	}
+	assert.Equal(t, "https://charts.example/", h.Repository)
+	assert.Equal(t, "my-chart", h.Chart)
+	assert.Equal(t, "1.2.3", h.Version)
+	assert.Equal(t, float64(3), h.Values["replicaCount"], "values not preserved")
+
+	require.Len(t, r.ValueMapping, 1)
+	assert.Equal(t, ".spec.size", r.ValueMapping[0].ClaimPath)
 }
 
 func TestRenderer_PlainManifests(t *testing.T) {
@@ -187,13 +170,11 @@ templates:
     kind: ConfigMap
 `
 	r := roundTrip[Renderer](t, in)
-	if r.Type != RendererTypePlainManifests {
-		t.Fatalf("type: %q", r.Type)
-	}
+	require.Equal(t, RendererTypePlainManifests, r.Type)
+
 	p := r.Spec.(*PlainManifestsSource)
-	if _, ok := p.Templates["a"]; !ok {
-		t.Fatalf("templates not preserved: %+v", p.Templates)
-	}
+	_, ok := p.Templates["a"]
+	assert.True(t, ok, "templates not preserved: %+v", p.Templates)
 }
 
 func TestRenderer_OmitsEmptyValueMapping(t *testing.T) {
@@ -202,20 +183,15 @@ func TestRenderer_OmitsEmptyValueMapping(t *testing.T) {
 		Spec: &HelmSource{Repository: "r", Chart: "c", Version: "v"},
 	}
 	out, err := yaml.Marshal(r)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if strings.Contains(string(out), "valueMapping") {
-		t.Fatalf("expected no valueMapping key, got %s", out)
-	}
+	require.NoError(t, err)
+	assert.NotContains(t, string(out), "valueMapping", "expected no valueMapping key")
 }
 
 func TestRenderer_UnknownType(t *testing.T) {
 	var r Renderer
 	err := yaml.Unmarshal([]byte(`type: "???"`), &r)
-	if err == nil || !strings.Contains(err.Error(), "unknown type") {
-		t.Fatalf("want unknown-type error, got %v", err)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown type")
 }
 
 func TestCredentialValue_AllSources(t *testing.T) {
@@ -230,9 +206,7 @@ func TestCredentialValue_AllSources(t *testing.T) {
 			`{source: const, value: literal}`,
 			CredSourceConst,
 			func(t *testing.T, s CredentialSpec) {
-				if s.(*CredConst).Value != "literal" {
-					t.Fatal("bad const")
-				}
+				assert.Equal(t, "literal", s.(*CredConst).Value)
 			},
 		},
 		{
@@ -240,9 +214,7 @@ func TestCredentialValue_AllSources(t *testing.T) {
 			`{source: template, value: "{{ $xr.metadata.name }}"}`,
 			CredSourceTemplate,
 			func(t *testing.T, s CredentialSpec) {
-				if s.(*CredTemplate).Value == "" {
-					t.Fatal("bad template")
-				}
+				assert.NotEmpty(t, s.(*CredTemplate).Value)
 			},
 		},
 		{
@@ -250,9 +222,7 @@ func TestCredentialValue_AllSources(t *testing.T) {
 			`{source: claim_param, path: .spec.foo}`,
 			CredSourceClaimParam,
 			func(t *testing.T, s CredentialSpec) {
-				if s.(*CredClaimParam).Path != ".spec.foo" {
-					t.Fatal("bad claim_param")
-				}
+				assert.Equal(t, ".spec.foo", s.(*CredClaimParam).Path)
 			},
 		},
 		{
@@ -261,9 +231,8 @@ func TestCredentialValue_AllSources(t *testing.T) {
 			CredSourceSecretRef,
 			func(t *testing.T, s CredentialSpec) {
 				c := s.(*CredSecretRef)
-				if c.Name != "my-secret" || c.Key != "password" {
-					t.Fatalf("bad secret_ref: %+v", c)
-				}
+				assert.Equal(t, "my-secret", c.Name)
+				assert.Equal(t, "password", c.Key)
 			},
 		},
 		{
@@ -271,9 +240,7 @@ func TestCredentialValue_AllSources(t *testing.T) {
 			`{source: expr, expression: observed.cluster.status.host}`,
 			CredSourceExpr,
 			func(t *testing.T, s CredentialSpec) {
-				if s.(*CredExpr).Expression == "" {
-					t.Fatal("bad expr")
-				}
+				assert.NotEmpty(t, s.(*CredExpr).Expression)
 			},
 		},
 		{
@@ -290,9 +257,11 @@ parse: json
 			CredSourceExec,
 			func(t *testing.T, s CredentialSpec) {
 				e := s.(*CredExec)
-				if e.Pod != "p" || e.Container != "c" || len(e.Command) != 3 || e.Env["K"] != "V" || e.Parse != "json" {
-					t.Fatalf("bad exec: %+v", e)
-				}
+				assert.Equal(t, "p", e.Pod)
+				assert.Equal(t, "c", e.Container)
+				assert.Len(t, e.Command, 3)
+				assert.Equal(t, "V", e.Env["K"])
+				assert.Equal(t, "json", e.Parse)
 			},
 		},
 	}
@@ -300,9 +269,7 @@ parse: json
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cv := roundTrip[CredentialValue](t, tc.yaml)
-			if cv.Source != tc.wantSource {
-				t.Fatalf("source: got %q want %q", cv.Source, tc.wantSource)
-			}
+			require.Equal(t, tc.wantSource, cv.Source)
 			tc.check(t, cv.Spec)
 		})
 	}
@@ -311,34 +278,24 @@ parse: json
 func TestCredentialValue_UnknownSource(t *testing.T) {
 	var cv CredentialValue
 	err := yaml.Unmarshal([]byte(`source: nope`), &cv)
-	if err == nil || !strings.Contains(err.Error(), "unknown source") {
-		t.Fatalf("want unknown-source error, got %v", err)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown source")
 }
 
 // TestExampleBundle parses examples/servicebundle.yaml. Guards against drift
 // between the example and the type definitions.
 func TestExampleBundle(t *testing.T) {
 	raw, err := os.ReadFile("../../examples/servicebundle.yaml")
-	if err != nil {
-		t.Fatalf("read example: %v", err)
-	}
+	require.NoError(t, err, "read example")
+
 	var sb ServiceBundle
-	if err := yaml.Unmarshal(raw, &sb); err != nil {
-		t.Fatalf("decode example: %v", err)
-	}
-	if sb.Meta.Name == "" {
-		t.Fatal("example missing meta.name")
-	}
-	if sb.Claim == nil || sb.Claim.Kind == "" {
-		t.Fatal("example missing claim.kind")
-	}
-	if sb.Renderer == nil {
-		t.Fatal("example missing renderer")
-	}
-	if len(sb.Pipeline) == 0 {
-		t.Fatal("example missing pipeline steps")
-	}
+	require.NoError(t, yaml.Unmarshal(raw, &sb), "decode example")
+
+	assert.NotEmpty(t, sb.Meta.Name, "example missing meta.name")
+	require.NotNil(t, sb.Claim, "example missing claim")
+	assert.NotEmpty(t, sb.Claim.Kind, "example missing claim.kind")
+	assert.NotNil(t, sb.Renderer, "example missing renderer")
+	assert.NotEmpty(t, sb.Pipeline, "example missing pipeline steps")
 }
 
 func TestServiceBundle_Decode(t *testing.T) {
@@ -356,7 +313,9 @@ renderer:
 pipeline:
   - kind: provisioning
   - kind: custom
-    function: ghcr.io/foo/fn:v1
+    function:
+      name: ghcr.io/foo/fn
+      versionConstraint: v1
     input:
       x: 1
   - kind: maintenance
@@ -373,26 +332,20 @@ credentials:
 `
 
 	var sb ServiceBundle
-	if err := yaml.Unmarshal([]byte(raw), &sb); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if sb.Meta.Name != "pg" {
-		t.Fatalf("meta: %+v", sb.Meta)
-	}
-	if sb.Renderer == nil || sb.Renderer.Type != RendererTypeHelm {
-		t.Fatalf("renderer: %+v", sb.Renderer)
-	}
-	if len(sb.Pipeline) != 3 {
-		t.Fatalf("pipeline len: %d", len(sb.Pipeline))
-	}
-	if sb.Pipeline[1].Kind != StepCustom {
-		t.Fatalf("pipeline[1] kind: %q", sb.Pipeline[1].Kind)
-	}
-	if _, ok := sb.Pipeline[2].Spec.(*MaintenanceStep); !ok {
-		t.Fatalf("pipeline[2] spec: %T", sb.Pipeline[2].Spec)
-	}
+	require.NoError(t, yaml.Unmarshal([]byte(raw), &sb), "decode")
+
+	assert.Equal(t, "pg", sb.Meta.Name)
+
+	require.NotNil(t, sb.Renderer)
+	assert.Equal(t, RendererTypeHelm, sb.Renderer.Type)
+
+	require.Len(t, sb.Pipeline, 3)
+	assert.Equal(t, StepCustom, sb.Pipeline[1].Kind)
+
+	_, ok := sb.Pipeline[2].Spec.(*MaintenanceStep)
+	assert.True(t, ok, "pipeline[2] spec: %T", sb.Pipeline[2].Spec)
+
 	host := sb.Credentials.ValueMapping["host"]
-	if host.Source != CredSourceExpr || host.Spec.(*CredExpr).Expression == "" {
-		t.Fatalf("host cred: %+v", host)
-	}
+	assert.Equal(t, CredSourceExpr, host.Source)
+	assert.NotEmpty(t, host.Spec.(*CredExpr).Expression)
 }

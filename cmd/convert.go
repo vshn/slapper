@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
+	"github.com/vshn/slapper/pkg/converter"
 )
 
 func init() {
@@ -16,5 +19,15 @@ var convertCmd = &cobra.Command{
 }
 
 func convert(cmd *cobra.Command, args []string) error {
-	return nil
+	if len(args) == 0 {
+		return fmt.Errorf("no file path provided")
+	}
+
+	c := converter.ServiceBundleConverter{}
+
+	if err := c.LoadBundle(args[0]); err != nil {
+		return err
+	}
+
+	return c.Convert()
 }
