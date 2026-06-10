@@ -3,10 +3,12 @@ package xrd
 
 import (
 	"fmt"
+	"log/slog"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/vshn/slapper/pkg/converter/xpconst"
 	"github.com/vshn/slapper/pkg/servicebundle"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // BuildXRD generates a Crossplane v2 namespaced CompositeResourceDefinition.
@@ -18,6 +20,7 @@ func BuildXRD(sb *servicebundle.ServiceBundle) (*unstructured.Unstructured, erro
 
 	xKind := c.XKind()
 	xrPlu := c.XPlu()
+	slog.Debug("derived composite names", "claimKind", c.Kind, "xKind", xKind, "xPlural", xrPlu, "xSingular", c.XSing())
 
 	params, err := buildParameterSchema(sb)
 	if err != nil {

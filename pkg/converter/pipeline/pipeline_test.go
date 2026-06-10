@@ -6,9 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vshn/slapper/pkg/servicebundle"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
+
+	"github.com/vshn/slapper/pkg/servicebundle"
 )
 
 type fakeRenderer struct {

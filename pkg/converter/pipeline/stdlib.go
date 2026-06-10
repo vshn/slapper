@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/vshn/slapper/pkg/servicebundle"
@@ -82,10 +83,16 @@ func (customRenderer) Render(step servicebundle.PipelineStep) (map[string]any, e
 		return nil, fmt.Errorf("custom step is missing function.name")
 	}
 
+	derived := deriveFunctionName(c.Function.Name)
+	slog.Debug("resolved custom step function",
+		"raw", c.Function.Name,
+		"derived", derived,
+		"versionConstraint", c.Function.VersionConstraint)
+
 	return map[string]any{
 		"step": "custom",
 		"functionRef": map[string]any{
-			"name": deriveFunctionName(c.Function.Name),
+			"name": derived,
 		},
 		"input": c.Input,
 	}, nil

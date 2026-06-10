@@ -2,10 +2,12 @@ package pipeline
 
 import (
 	"fmt"
+	"log/slog"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/vshn/slapper/pkg/converter/xpconst"
 	"github.com/vshn/slapper/pkg/servicebundle"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // BuildComposition creates a Crossplane v2 compositon containing the steps
@@ -56,8 +58,11 @@ func populateSteps(sb *servicebundle.ServiceBundle) ([]any, error) {
 		r, ok := Get(step.Kind)
 
 		if !ok {
+			slog.Warn("no renderer registered for step kind", "step", i, "kind", step.Kind, "registered", registeredKinds())
 			return nil, fmt.Errorf("step %d (%s): no renderer registered for kind %q", i, step.Kind, step.Kind)
 		}
+
+		slog.Debug("rendering pipeline step", "step", i, "kind", step.Kind)
 
 		entry, err := r.Render(step)
 		if err != nil {
