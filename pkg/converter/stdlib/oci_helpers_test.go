@@ -1,6 +1,8 @@
 package stdlib
 
 import (
+	"archive/tar"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -22,7 +24,6 @@ const (
 	manifestMediaType = "application/vnd.oci.image.manifest.v1+json"
 	configMediaType   = "application/vnd.oci.image.config.v1+json"
 	layerMediaType    = "application/vnd.oci.image.layer.v1.tar"
-	titleAnnotation   = "org.opencontainers.image.title"
 )
 
 type ociDescriptor struct {
@@ -38,9 +39,9 @@ type fakeArtifact struct {
 	blobs          map[string][]byte
 }
 
-// buildArtifact walks fixtureDir, packs every file as a single-blob layer with
-// the relative path stored in the title annotation, builds an OCI image
-// manifest, and returns the manifest bytes + a digest→bytes blob map.
+// buildArtifact walks fixtureDir, packs all files into a single tar layer,
+// builds an OCI image manifest, and returns the manifest bytes + a
+// digest→bytes blob map.
 func buildArtifact(t *testing.T, fixtureDir string) fakeArtifact {
 	t.Helper()
 	blobs := map[string][]byte{}
@@ -52,10 +53,11 @@ func buildArtifact(t *testing.T, fixtureDir string) fakeArtifact {
 		return d, int64(len(content))
 	}
 
-	configBytes := []byte("{}")
-	configDigest, configSize := add(configBytes)
-
-	var layers []ociDescriptor
+	// ggcr's image validation requires rootfs.diff_ids to match layer
+	// uncompressed digests. Build the tar first so we can plug the digest
+	// into the config.
+	var tarBuf bytes.Buffer
+	tw := tar.NewWriter(&tarBuf)
 	err := filepath.WalkDir(fixtureDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -72,17 +74,35 @@ func buildArtifact(t *testing.T, fixtureDir string) fakeArtifact {
 		if readErr != nil {
 			return readErr
 		}
-		dg, sz := add(content)
-		layers = append(layers, ociDescriptor{
-			MediaType:   layerMediaType,
-			Digest:      dg,
-			Size:        sz,
-			Annotations: map[string]string{titleAnnotation: rel},
-		})
-		return nil
+		hdr := &tar.Header{
+			Name:     rel,
+			Mode:     0o644,
+			Size:     int64(len(content)),
+			Typeflag: tar.TypeReg,
+		}
+		if writeErr := tw.WriteHeader(hdr); writeErr != nil {
+			return writeErr
+		}
+		_, writeErr := tw.Write(content)
+		return writeErr
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, layers, "fixture %q produced no layers", fixtureDir)
+	require.NoError(t, tw.Close())
+	require.NotZero(t, tarBuf.Len(), "fixture %q produced empty tar", fixtureDir)
+
+	layerDigest, layerSize := add(tarBuf.Bytes())
+
+	cfg := map[string]any{
+		"architecture": "amd64",
+		"os":           "linux",
+		"rootfs": map[string]any{
+			"type":     "layers",
+			"diff_ids": []string{layerDigest},
+		},
+	}
+	configBytes, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	configDigest, configSize := add(configBytes)
 
 	manifest := map[string]any{
 		"schemaVersion": 2,
@@ -92,7 +112,11 @@ func buildArtifact(t *testing.T, fixtureDir string) fakeArtifact {
 			Digest:    configDigest,
 			Size:      configSize,
 		},
-		"layers": layers,
+		"layers": []ociDescriptor{{
+			MediaType: layerMediaType,
+			Digest:    layerDigest,
+			Size:      layerSize,
+		}},
 	}
 	mJSON, err := json.Marshal(manifest)
 	require.NoError(t, err)
