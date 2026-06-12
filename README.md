@@ -2,11 +2,29 @@
 
 It slaps your service into AppCat form!
 
-## Getting started
+## What?!
 
-Check out the example to AppSlappify an existing helm chart.
+Slapper takes an opinionated service description and converts it into Crossplane compositions and XRDs.
+These manifests can then either be applied directly to a cluster, or be turned into a xpkg.
 
-TODO: more docs and a proper getting started, once we have something.
+A service bundle specifies what a service needs to be running.
+Additionally, it also describes an API for the end-user to spawn an instance of the service.
+
+The service bundle consists of:
+
+- The service's base manifests like a helm chart or some plain manifests
+- It's possible to pass default values to the chart and map fields from the XRD to the values as well
+- Additional configuration in an implementation agnostic way, for example backups, network, or maintenance
+- Custom steps to define additional application specific deployment logic
+
+Important is, that apart from the base manifest and custom logic, all steps in the service bundle only describe an intent.
+The implementation of the pipeline steps comes from the stdlib.
+Stdlibs contain the specific implementation for each of the pipeline steps.
+Different stdlib can be used depending on the customer or platform.
+
+This allows for abstracting the service specifics from the platform and customer specifics.
+A service maintainer doesn't have to ask: "do I need an ingress or gateway manifest?" they only need to specify
+how the service should get exposed, the rest is handled by the stdlib.
 
 ## Stdlib resolution
 
