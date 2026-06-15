@@ -1,0 +1,34 @@
+apiVersion: slapper.appslap.io/v1alpha1
+kind: Stdlib
+metadata:
+  name: test-stdlib
+  version: 0.0.1
+steps:
+  - kind: provisioning
+    function:
+      name: xpkg.upbound.io/crossplane-contrib/function-kcl
+      versionConstraint: ">=v0.10.0"
+    inputFile: templates/provisioning.kcl
+  - kind: networking
+    function:
+      name: xpkg.upbound.io/crossplane-contrib/function-kcl
+      versionConstraint: ">=v0.10.0"
+    inputFile: templates/networking.kcl
+  - kind: backup
+    function:
+      name: xpkg.upbound.io/crossplane-contrib/function-kcl
+      versionConstraint: ">=v0.10.0"
+    inputFile: templates/backup.kcl
+  - kind: monitoring
+    function:
+      name: xpkg.upbound.io/crossplane-contrib/function-kcl
+      versionConstraint: ">=v0.10.0"
+    inputFile: templates/monitoring.kcl
+  - kind: maintenance
+    function:
+      name: xpkg.upbound.io/crossplane-contrib/function-kcl
+      versionConstraint: ">=v0.10.0"
+    inputFile: templates/maintenance.kcl
+schemaFragments:
+  size: schemas/size.yaml
+  monitoring: schemas/monitoring.yaml

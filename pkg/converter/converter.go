@@ -2,40 +2,115 @@
 package converter
 
 import (
+	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"sigs.k8s.io/yaml"
 
 	"github.com/vshn/slapper/pkg/converter/pipeline"
+	"github.com/vshn/slapper/pkg/converter/pkgmeta"
+	"github.com/vshn/slapper/pkg/converter/stdlib"
 	"github.com/vshn/slapper/pkg/converter/xrd"
 	"github.com/vshn/slapper/pkg/servicebundle"
 )
-
-const outputDir = "xpkg"
 
 var ErrBundleNotLoaded = fmt.Errorf("the bundle hasn't been loaded")
 
 type ServiceBundleConverter struct {
 	serviceBundle *servicebundle.ServiceBundle
+	StdlibSource  stdlib.Source
+	OutputDir     string
 }
 
-// Convert converts the loaded bundle into a Crossplane package
-func (s *ServiceBundleConverter) Convert() error {
+// Meta returns the loaded bundle's meta block. Returns zero value if no
+// bundle has been loaded yet -> callers should LoadBundle first.
+func (s *ServiceBundleConverter) Meta() servicebundle.Meta {
+	if s.serviceBundle == nil {
+		return servicebundle.Meta{}
+	}
+	return s.serviceBundle.Meta
+}
+
+// Convert converts the loaded bundle into a Crossplane package. The context
+// is forwarded to the stdlib loader so OCI pulls honour cancellation /
+// deadlines from the caller (e.g. cobra's cmd.Context()).
+func (s *ServiceBundleConverter) Convert(ctx context.Context) error {
+	if s.OutputDir == "" {
+		s.OutputDir = "xpkg"
+	}
+
 	if s.serviceBundle == nil {
 		return ErrBundleNotLoaded
 	}
 
+	var xrdFragments map[string]any
+	if s.StdlibSource != nil {
+		m, files, err := stdlib.Load(ctx, s.StdlibSource)
+		if err != nil {
+			return fmt.Errorf("loading stdlib: %w", err)
+		}
+
+		err = stdlib.RegisterAll(m, files)
+		if err != nil {
+			return fmt.Errorf("registering stdlib: %w", err)
+		}
+
+		deps, err := stdlib.BuildDependencies(m, s.serviceBundle.Pipeline)
+		if err != nil {
+			return fmt.Errorf("parsing dependencies: %w", err)
+		}
+
+		metapkg, err := pkgmeta.BuildConfiguration(s.serviceBundle.Meta.Name, deps)
+		if err != nil {
+			return fmt.Errorf("writing crossplane meta pkg: %w", err)
+		}
+
+		err = writeToFile(metapkg.Object, "crossplane", s.OutputDir)
+		if err != nil {
+			return err
+		}
+
+		functions := make([]string, 0, len(deps))
+		for _, d := range deps {
+			functions = append(functions, d.Function)
+		}
+		slog.Info("xpkg dependencies emitted", "count", len(deps), "functions", functions)
+
+		xrdFrags, err := decodeFragments(m, files)
+		if err != nil {
+			return fmt.Errorf("decoding xrd fragments: %w", err)
+		}
+
+		xrdFragments = xrdFrags
+
+	}
+
 	slog.Info("rendering XRD")
 
-	xrd, err := xrd.BuildXRD(s.serviceBundle)
+	xrdObj, err := xrd.BuildXRD(s.serviceBundle)
 	if err != nil {
 		return fmt.Errorf("rendering XRD failed: %w", err)
 	}
 
-	err = writeToFile(xrd.Object, "xrd")
+	if xrdFragments != nil {
+		err := xrd.MergeFrameworkFragments(xrdObj, xrdFragments)
+		if err != nil {
+			return err
+		}
+		keys := make([]string, 0, len(xrdFragments))
+		for k := range xrdFragments {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		slog.Info("stdlib schema fragments merged", "keys", keys)
+	}
+
+	err = writeToFile(xrdObj.Object, "xrd", s.OutputDir)
 	if err != nil {
 		return err
 	}
@@ -47,7 +122,7 @@ func (s *ServiceBundleConverter) Convert() error {
 		return fmt.Errorf("rendering Composition failed: %w", err)
 	}
 
-	err = writeToFile(comp.Object, "composition")
+	err = writeToFile(comp.Object, "composition", s.OutputDir)
 	if err != nil {
 		return err
 	}
@@ -55,7 +130,7 @@ func (s *ServiceBundleConverter) Convert() error {
 	return nil
 }
 
-func writeToFile(rawData map[string]any, filename string) error {
+func writeToFile(rawData map[string]any, filename, outputDir string) error {
 	slog.Debug("writing file", "filename", filename)
 
 	data, err := yaml.Marshal(rawData)
@@ -103,4 +178,24 @@ func (s *ServiceBundleConverter) LoadBundle(path string) error {
 	slog.Info("loaded bundle", attrs...)
 
 	return nil
+}
+
+func decodeFragments(m *stdlib.Manifest, files fs.FS) (map[string]any, error) {
+	out := map[string]any{}
+
+	for k, path := range m.SchemaFragments {
+		b, err := fs.ReadFile(files, path)
+		if err != nil {
+			return nil, fmt.Errorf("read fragment %s: %w", path, err)
+		}
+
+		var v map[string]any
+		if err := yaml.Unmarshal(b, &v); err != nil {
+			return nil, fmt.Errorf("parse fragment %s: %w", path, err)
+		}
+
+		out[k] = v
+	}
+
+	return out, nil
 }

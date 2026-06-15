@@ -37,6 +37,9 @@ func BuildXRD(sb *servicebundle.ServiceBundle) (*unstructured.Unstructured, erro
 		"appslap.io/maintainer":    sb.Meta.Author,
 	})
 
+	// we're using unstructured.unstructured, because
+	// Crossplane's upstream XRD struct also just
+	// contains a raw map[string]any for openAPIV3Schema
 	xrd.Object["spec"] = map[string]any{
 		"scope": "Namespaced",
 		"group": xpconst.Group,
@@ -83,4 +86,64 @@ func BuildXRD(sb *servicebundle.ServiceBundle) (*unstructured.Unstructured, erro
 	}
 
 	return xrd, nil
+}
+
+func MergeFrameworkFragments(xrd *unstructured.Unstructured, fragments map[string]any) error {
+	if fragments == nil {
+		return nil
+	}
+
+	raw, _, err := unstructured.NestedFieldNoCopy(xrd.Object, "spec", "versions")
+	if err != nil {
+		return fmt.Errorf("xrd cannot get versions: %w", err)
+	}
+
+	versions, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("xrd versions has unexpected type %T", raw)
+	}
+	if len(versions) == 0 {
+		return fmt.Errorf("xrd has no versions")
+	}
+
+	// Crossplane doesn't really support multiple versions at the moment...
+	v0, ok := versions[0].(map[string]any)
+	if !ok {
+		return fmt.Errorf("xrd version[0] has unexpected type %T", versions[0])
+	}
+
+	raw, found, err := unstructured.NestedFieldNoCopy(v0,
+		"schema", "openAPIV3Schema",
+		"properties", "spec",
+		"properties", "parameters", "properties")
+	if err != nil {
+		return fmt.Errorf("xrd parameters properties: %w", err)
+	}
+
+	var props map[string]any
+	if !found {
+		props = map[string]any{}
+	} else {
+		props, ok = raw.(map[string]any)
+		if !ok {
+			return fmt.Errorf("xrd parameters properties has unexpected type %T", raw)
+		}
+	}
+
+	for k, v := range fragments {
+		if _, exists := props[k]; exists {
+			return fmt.Errorf("service schema field %s collides with framework fragment", k)
+		}
+		props[k] = v
+	}
+
+	// NestedFieldNoCopy returns the in-tree map on the found path, so mutations
+	// already propagated. Only need an explicit Set when we created props fresh.
+	if !found {
+		return unstructured.SetNestedField(v0, props,
+			"schema", "openAPIV3Schema",
+			"properties", "spec",
+			"properties", "parameters", "properties")
+	}
+	return nil
 }

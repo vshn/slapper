@@ -1,0 +1,13 @@
+apiVersion: krm.kcl.dev/v1alpha1
+kind: KCLInput
+spec:
+  source: |
+    oxr = option("params").oxr
+    cm = {
+        apiVersion = "v1"
+        kind = "ConfigMap"
+        metadata.name = "networking"
+        metadata.annotations: {"krm.kcl.dev/ready": "True"}
+        data.content = "stdlib"
+    }
+    items = [cm]

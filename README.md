@@ -2,8 +2,72 @@
 
 It slaps your service into AppCat form!
 
-## Getting started
+## What?!
 
-Check out the example to AppSlappify an existing helm chart.
+Slapper takes an opinionated service description and converts it into Crossplane compositions and XRDs.
+These manifests can then either be applied directly to a cluster, or be turned into a xpkg.
 
-TODO: more docs and a proper getting started, once we have something.
+A service bundle specifies what a service needs to be running.
+Additionally, it also describes an API for the end-user to spawn an instance of the service.
+
+The service bundle consists of:
+
+- The service's base manifests like a helm chart or some plain manifests
+- It's possible to pass default values to the chart and map fields from the XRD to the values as well
+- Additional configuration in an implementation agnostic way, for example backups, network, or maintenance
+- Custom steps to define additional application specific deployment logic
+
+Important is, that apart from the base manifest and custom logic, all steps in the service bundle only describe an intent.
+The implementation of the pipeline steps comes from the stdlib.
+Stdlibs contain the specific implementation for each of the pipeline steps.
+Different stdlib can be used depending on the customer or platform.
+
+This allows for abstracting the service specifics from the platform and customer specifics.
+A service maintainer doesn't have to ask: "do I need an ingress or gateway manifest?" they only need to specify
+how the service should get exposed, the rest is handled by the stdlib.
+
+## Stdlib resolution
+
+The pipeline step renderers, the framework-wide XRD schema fragments and the
+Crossplane Configuration `dependsOn` list are sourced from an external
+**stdlib** instead of being baked into the binary. The CLI supports three
+resolution modes:
+
+### Default — OCI artifact from `meta.stdlib`
+
+The bundle's `meta.stdlib` field is treated as an OCI reference. The artifact
+is pulled and cached by digest under `$XDG_CACHE_HOME/slapper/stdlib`.
+Subsequent runs with the same digest skip the network.
+
+```yaml
+meta:
+  stdlib: ghcr.io/vshn/servicebundle-stdlib:v0.1.0
+```
+
+```sh
+slap examples/servicebundle.yaml
+```
+
+### `--stdlib-path` — local directory
+
+Point at an unpacked stdlib on disk. Useful for stdlib development.
+`meta.stdlib` is ignored.
+
+```sh
+slap --stdlib-path ./my-stdlib examples/servicebundle.yaml
+```
+
+### `--no-stdlib` — in-tree dummies, debug only
+
+Skip stdlib resolution entirely. Step renderers fall back to in-tree dummies
+and no `crossplane.yaml` Configuration meta is emitted. If `meta.stdlib` is
+set, a warning is logged. Not for production output.
+
+```sh
+slap --no-stdlib examples/servicebundle.yaml
+```
+
+### Other flags
+
+- `--stdlib-cache-dir` — override the digest-keyed cache location.
+- `--output` — change the package output directory (default `xpkg`).

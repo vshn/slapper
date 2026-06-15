@@ -14,9 +14,8 @@ type StepRenderer interface {
 
 var registry = map[servicebundle.PipelineStepKind]StepRenderer{}
 
-// Register dynamically registers steps from an external
-// stdlib.
-// TODO: not yet in use, a stdlib dummy will follow.
+// Register dynamically registers steps from an external stdlib.
+// Stdlib renderers override any in-tree dummy with the same kind.
 func Register(r StepRenderer) {
 	registry[r.Kind()] = r
 }
