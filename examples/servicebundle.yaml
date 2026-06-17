@@ -13,25 +13,31 @@ claim:
   # full OpenAPI v3 schema and merged into the XRD under spec.parameters.service.
   simpleSchema:
     majorVersion: string | enum="15,16,17" default="16" description="PostgreSQL major version. Maps to chart version.postgresql."
-    database: string | default="app" description="Initial database name (bootstrap.initdb.database)."
-    user: string | default="appuser" description="Initial database owner (bootstrap.initdb.owner)."
+    database: string | default="app" description="Initial database name. Maps to chart cluster.initdb.database."
+    user: string | default="appuser" description="Initial database owner. Maps to chart cluster.initdb.owner."
 
 renderer:
   type: helm
-  repository: https://charts.cnpg.io/
-  chart: cluster
-  version: 0.4.0
+  repository: https://charts.appcat.ch
+  chart: vshnpostgresql
+  version: 0.8.1
   values:
     fullnameOverride: pg
+    type: postgresql
+    mode: standalone
+    version:
+      postgresql: "16"
     cluster:
       instances: 1
       storage:
         size: 1Gi
+    backups:
+      enabled: false
   valueMapping:
-    - claimPath: .spec.parameters.size.replicas
+    - claimPath: .spec.parameters.service.majorVersion
+      target: version.postgresql
+    - claimPath: .spec.parameters.instances
       target: cluster.instances
-    - claimPath: .spec.parameters.size.disk
-      target: cluster.storage.size
 
 pipeline:
   - kind: provisioning
@@ -101,7 +107,7 @@ credentials:
       value: "{{ $xr.metadata.name }}-rw.{{ $xr.metadata.namespace }}.svc.cluster.local"
     POSTGRESQL_DB:
       source: claim_param
-      path: .spec.parameters.service.databaseName
+      path: .spec.parameters.service.database
     POSTGRESQL_PASSWORD:
       source: secret_ref
       name: pg-app-user

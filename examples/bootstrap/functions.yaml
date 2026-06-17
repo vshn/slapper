@@ -1,0 +1,14 @@
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-kcl
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-kcl:v0.11.2
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-python
+spec:
+  package: ghcr.io/crossplane-contrib/function-python:v0.4.0
