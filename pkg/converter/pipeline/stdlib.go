@@ -36,9 +36,9 @@ type dummyRenderer struct {
 
 func (b dummyRenderer) Kind() servicebundle.PipelineStepKind { return b.kind }
 
-func (b dummyRenderer) Render(_ servicebundle.PipelineStep) (map[string]any, error) {
+func (b dummyRenderer) Render(_ servicebundle.PipelineStep, i int) (map[string]any, error) {
 	return map[string]any{
-		"step": string(b.kind),
+		"step": fmt.Sprintf("%s-%d", b.kind, i),
 		"functionRef": map[string]any{
 			"name": "function-kcl",
 		},
@@ -73,7 +73,7 @@ type customRenderer struct{}
 
 func (customRenderer) Kind() servicebundle.PipelineStepKind { return servicebundle.StepCustom }
 
-func (customRenderer) Render(step servicebundle.PipelineStep) (map[string]any, error) {
+func (customRenderer) Render(step servicebundle.PipelineStep, i int) (map[string]any, error) {
 	c, ok := step.Spec.(*servicebundle.CustomStep)
 	if !ok {
 		return nil, fmt.Errorf("custom step has wrong spec type %T", step.Spec)
@@ -90,7 +90,7 @@ func (customRenderer) Render(step servicebundle.PipelineStep) (map[string]any, e
 		"versionConstraint", c.Function.VersionConstraint)
 
 	return map[string]any{
-		"step": "custom",
+		"step": fmt.Sprintf("custom-%d", i),
 		"functionRef": map[string]any{
 			"name": derived,
 		},

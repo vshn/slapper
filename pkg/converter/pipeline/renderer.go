@@ -9,7 +9,7 @@ import "github.com/vshn/slapper/pkg/servicebundle"
 // that.
 type StepRenderer interface {
 	Kind() servicebundle.PipelineStepKind
-	Render(step servicebundle.PipelineStep) (map[string]any, error)
+	Render(step servicebundle.PipelineStep, i int) (map[string]any, error)
 }
 
 var registry = map[servicebundle.PipelineStepKind]StepRenderer{}
