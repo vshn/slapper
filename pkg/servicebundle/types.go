@@ -92,6 +92,24 @@ type Renderer struct {
 	ValueMapping []ValueMappingItem
 }
 
+func (r *Renderer) Validate() error {
+	switch r.Type {
+	case RendererTypeHelm:
+		h, ok := r.Spec.(*HelmSource)
+		if !ok {
+			return fmt.Errorf("renderer type=helm but spec is %T", r.Spec)
+		}
+
+		if h == nil {
+			return nil
+		}
+
+		return h.Validate()
+	default:
+		return fmt.Errorf("unknown renderer type %q", r.Type)
+	}
+}
+
 // RendererSourceSpec is implemented by every concrete renderer source. New
 // types: define a struct, implement RendererType(), register via
 // RegisterRendererType.
@@ -110,6 +128,28 @@ type HelmSource struct {
 }
 
 func (HelmSource) RendererType() RendererType { return RendererTypeHelm }
+
+func (h *HelmSource) Validate() error {
+	errs := []string{}
+
+	if h.Chart == "" {
+		errs = append(errs, "chart")
+	}
+
+	if h.Repository == "" {
+		errs = append(errs, "repository")
+	}
+
+	if h.Version == "" {
+		errs = append(errs, "version")
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("required fields: %s", strings.Join(errs, ","))
+	}
+
+	return nil
+}
 
 type PlainManifestsSource struct {
 	// Templates is a map of inline manifests. Each entry is a single
