@@ -87,9 +87,9 @@ const (
 // Renderer is a tagged union: Type discriminates, Spec carries type-specific
 // source fields. ValueMapping is type-independent and stays at renderer level.
 type Renderer struct {
-	Type         RendererType
+	Type         RendererType `json:"type"`
 	Spec         RendererSourceSpec
-	ValueMapping []ValueMappingItem
+	ValueMapping []ValueMappingItem `json:"valueMapping,omitempty"`
 }
 
 func (r *Renderer) Validate() error {
@@ -225,7 +225,7 @@ const (
 
 // PipelineStep kind defines the step and spec holds the specifics.
 type PipelineStep struct {
-	Kind PipelineStepKind
+	Kind PipelineStepKind `json:"kind"`
 	Spec StepSpec
 }
 

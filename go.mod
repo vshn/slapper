@@ -5,6 +5,7 @@ go 1.26.1
 require (
 	github.com/gobuffalo/flect v1.0.3
 	github.com/google/go-containerregistry v0.21.6
+	github.com/google/jsonschema-go v0.4.3
 	github.com/kubernetes-sigs/kro v0.9.2
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/spf13/cobra v1.10.2

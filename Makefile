@@ -22,6 +22,7 @@ build: generate ## Build binary
 
 .PHONY: generate
 generate: ## Run go generate against code
+	go run ./tools/jsonschema > slapper.schema.json
 	go generate ./...
 
 .PHONY: fmt
