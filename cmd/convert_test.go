@@ -212,6 +212,20 @@ func TestConvert_ValidBundleSucceeds(t *testing.T) {
 	require.NoError(t, root.Execute())
 }
 
+func TestConvert_NoStdlibWithRenderer_Warn(t *testing.T) {
+	dir := t.TempDir()
+	bundlePath := filepath.Join(dir, "bundle.yaml")
+	require.NoError(t, os.WriteFile(bundlePath, []byte(helmBundle), 0o644))
+	out := filepath.Join(dir, "out")
+
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", "--no-stdlib", "--output", out, bundlePath})
+	require.NoError(t, root.Execute())
+
+	_, err := os.Stat(filepath.Join(out, "composition.yaml"))
+	require.NoError(t, err)
+}
+
 func TestConvert_NoStdlibWithMetaSet_Warn(t *testing.T) {
 	// Write minimal bundle with Meta.Stdlib set; run with --no-stdlib.
 	// Assert exit succeeds (warn only). Compositions emitted with in-tree dummies.

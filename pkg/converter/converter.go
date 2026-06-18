@@ -36,6 +36,15 @@ func (s *ServiceBundleConverter) Meta() servicebundle.Meta {
 	return s.serviceBundle.Meta
 }
 
+// Renderer returns the loaded renderer block. Returns nil if no
+// bundle has been loaded yet -> callers should LoadBundle first.
+func (s *ServiceBundleConverter) Renderer() *servicebundle.Renderer {
+	if s.serviceBundle == nil {
+		return nil
+	}
+	return s.serviceBundle.Renderer
+}
+
 // Convert converts the loaded bundle into a Crossplane package. The context
 // is forwarded to the stdlib loader so OCI pulls honour cancellation /
 // deadlines from the caller (e.g. cobra's cmd.Context()).
