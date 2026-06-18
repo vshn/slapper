@@ -44,8 +44,14 @@ func (s *ServiceBundleConverter) Convert(ctx context.Context) error {
 		s.OutputDir = "xpkg"
 	}
 
-	if s.serviceBundle == nil {
-		return ErrBundleNotLoaded
+	if s.StdlibSource == nil {
+		if s.serviceBundle == nil {
+			return ErrBundleNotLoaded
+		}
+
+		if err := s.validateBundle(); err != nil {
+			return err
+		}
 	}
 
 	var xrdFragments map[string]any
@@ -55,7 +61,7 @@ func (s *ServiceBundleConverter) Convert(ctx context.Context) error {
 			return fmt.Errorf("loading stdlib: %w", err)
 		}
 
-		err = stdlib.RegisterAll(m, files)
+		err = stdlib.RegisterAll(m, files, s.serviceBundle)
 		if err != nil {
 			return fmt.Errorf("registering stdlib: %w", err)
 		}
@@ -176,6 +182,29 @@ func (s *ServiceBundleConverter) LoadBundle(path string) error {
 		attrs = append(attrs, "rendererType", string(sb.Renderer.Type))
 	}
 	slog.Info("loaded bundle", attrs...)
+
+	return nil
+}
+
+func (s *ServiceBundleConverter) validateBundle() error {
+	if s.serviceBundle.Renderer == nil {
+		return fmt.Errorf("bundle.renderer is required")
+	}
+
+	if err := s.serviceBundle.Renderer.Validate(); err != nil {
+		return fmt.Errorf("bundle.renderer: %w", err)
+	}
+
+	provisioningCount := 0
+	for _, step := range s.serviceBundle.Pipeline {
+		if step.Kind == servicebundle.StepProvisioning {
+			provisioningCount++
+		}
+	}
+
+	if provisioningCount != 1 {
+		return fmt.Errorf("pipeline must contain exactly one provisioning step, found: %d", provisioningCount)
+	}
 
 	return nil
 }

@@ -25,6 +25,11 @@ meta:
   stdlib: %s
 claim:
   kind: Foo
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
+  chart: cluster
+  version: 0.4.0
 pipeline:
   - kind: provisioning
 `, ref)
@@ -44,6 +49,72 @@ meta:
   stdlib: ""
 claim:
   kind: Foo
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
+  chart: cluster
+  version: 0.4.0
+pipeline:
+  - kind: provisioning
+`
+
+const helmBundle = `
+meta:
+  name: pg
+  author: vshn
+  version: 0.1.0
+  stdlib: ""
+claim:
+  kind: Foo
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
+  chart: cluster
+  version: 0.4.0
+pipeline:
+  - kind: provisioning
+`
+
+const helmBundleNoProvisioning = `
+meta:
+  name: pg
+  author: vshn
+  version: 0.1.0
+  stdlib: ""
+claim:
+  kind: Foo
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
+  chart: cluster
+  version: 0.4.0
+pipeline:
+  - kind: backup
+`
+
+const helmBundleNoRenderer = `
+meta:
+  name: pg
+  author: vshn
+  version: 0.1.0
+  stdlib: ""
+claim:
+  kind: Foo
+pipeline:
+  - kind: provisioning
+`
+
+const helmBundleInvalidRenderer = `
+meta:
+  name: pg
+  author: vshn
+  version: 0.1.0
+  stdlib: ""
+claim:
+  kind: Foo
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
 pipeline:
   - kind: provisioning
 `
@@ -93,6 +164,52 @@ func TestConvert_StdlibPath_NonexistentDir(t *testing.T) {
 	root.SetArgs([]string{"convert", "--stdlib-path", "/does/not/exist", "bundle.yaml"})
 	err := root.Execute()
 	require.Error(t, err)
+}
+
+func TestConvert_MissingRendererErrors(t *testing.T) {
+	dir := t.TempDir()
+	bundlePath := filepath.Join(dir, "bundle.yaml")
+	require.NoError(t, os.WriteFile(bundlePath, []byte(helmBundleNoRenderer), 0o644))
+
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", "--no-stdlib", "--output", filepath.Join(dir, "out"), bundlePath})
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "renderer")
+}
+
+func TestConvert_MissingProvisioningErrors(t *testing.T) {
+	dir := t.TempDir()
+	bundlePath := filepath.Join(dir, "bundle.yaml")
+	require.NoError(t, os.WriteFile(bundlePath, []byte(helmBundleNoProvisioning), 0o644))
+
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", "--no-stdlib", "--output", filepath.Join(dir, "out"), bundlePath})
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "provisioning")
+}
+
+func TestConvert_InvalidRendererSpecErrors(t *testing.T) {
+	dir := t.TempDir()
+	bundlePath := filepath.Join(dir, "bundle.yaml")
+	require.NoError(t, os.WriteFile(bundlePath, []byte(helmBundleInvalidRenderer), 0o644))
+
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", "--no-stdlib", "--output", filepath.Join(dir, "out"), bundlePath})
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "chart")
+}
+
+func TestConvert_ValidBundleSucceeds(t *testing.T) {
+	dir := t.TempDir()
+	bundlePath := filepath.Join(dir, "bundle.yaml")
+	require.NoError(t, os.WriteFile(bundlePath, []byte(helmBundle), 0o644))
+
+	root := newRootCmd()
+	root.SetArgs([]string{"convert", "--no-stdlib", "--output", filepath.Join(dir, "out"), bundlePath})
+	require.NoError(t, root.Execute())
 }
 
 func TestConvert_NoStdlibWithMetaSet_Warn(t *testing.T) {
