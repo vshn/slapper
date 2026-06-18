@@ -4,7 +4,7 @@ meta:
   name: postgresql
   author: vshn
   version: 0.1.0
-  stdlib: ghcr.io/vshn/servicebundle-stdlib:v0.1.0
+  stdlib: ghcr.io/vshn/slaplib:v0.0.3
 
 claim:
   kind: VSHNPostgreSQL
