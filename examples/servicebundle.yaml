@@ -29,9 +29,9 @@ renderer:
         size: 1Gi
   valueMapping:
     - claimPath: .spec.parameters.size.replicas
-      target: .spec.cluster.instances
+      target: cluster.instances
     - claimPath: .spec.parameters.size.disk
-      target: .spec.cluster.storage.size
+      target: cluster.storage.size
 
 pipeline:
   - kind: provisioning
