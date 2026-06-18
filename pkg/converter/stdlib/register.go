@@ -8,10 +8,10 @@ import (
 	"github.com/vshn/slapper/pkg/servicebundle"
 )
 
-func RegisterAll(m *Manifest, files fs.FS) error {
+func RegisterAll(m *Manifest, files fs.FS, bundle *servicebundle.ServiceBundle) error {
 	kinds := make([]servicebundle.PipelineStepKind, 0, len(m.Steps))
 	for _, step := range m.Steps {
-		pipeline.Register(newRenderer(step, files))
+		pipeline.Register(newRenderer(step, files, bundle))
 		kinds = append(kinds, step.Kind)
 	}
 
