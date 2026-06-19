@@ -12,9 +12,9 @@ import (
 	"github.com/vshn/slapper/pkg/servicebundle"
 )
 
-// MergeValues deep-clones h.Values, applies vm (each item deep-sets a
-// kcl.Ref at the target path), and returns the merged map. The returned
-// map is suitable for kcl.Emit.
+// MergeValues applies vm to h.Values (each item deep-sets a kcl.Ref at the target path),
+and returns the merged map. The returned map is suitable for kcl.Emit.
+// The input map is not modified.
 func MergeValues(h servicebundle.HelmSource, vm []servicebundle.ValueMappingItem) (map[string]any, error) {
 	result := h.Values
 
