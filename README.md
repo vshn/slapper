@@ -1,6 +1,10 @@
 # ServiceLayer AppCat Pipeline Package Emission Renderer (Slapper)
 
-It slaps your service into AppCat form!
+
+<p align="center">
+  <img width=512px src="./assets/slap.png" alt="Batman slapping Robin meme" /><br />
+<i>It slaps your service into AppCat form!</i>
+</p>
 
 ## What?!
 
