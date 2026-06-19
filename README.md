@@ -83,6 +83,8 @@ Install all dependencies.
 
 ```sh
 kubectl apply -f examples/bootstrap/
+kubectl wait --for=create crd/clusterproviderconfigs.helm.m.crossplane.io
+kubectl apply -f examples/bootstrap/
 kubectl apply -f xpkg/xrd.yaml -f xpkg/composition.yaml
 ```
 
