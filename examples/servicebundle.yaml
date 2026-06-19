@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=./../slapper.schema.json
 # Full example ServiceBundle. Demonstrates every pipeline step kind, renderer
 # type and credential source the framework currently recognises.
 meta:
