@@ -14,8 +14,8 @@ var (
 	emptyList = regexp.MustCompile(`\[\n\s*\]`)
 )
 
-// Ref is a raw KCL expression.
-type Ref struct {
+// RawKCL is a raw KCL expression.
+type RawKCL struct {
 	Expr string
 }
 
@@ -23,7 +23,7 @@ type Ref struct {
 // The marshaller would otherwise interpret
 // the expression as an object, instead of a
 // verbatim KCL expression.
-func (r Ref) MarshalKcl() ([]byte, error) {
+func (r RawKCL) MarshalKcl() ([]byte, error) {
 	return []byte(r.Expr), nil
 }
 

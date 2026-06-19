@@ -39,16 +39,16 @@ func MergeValues(h servicebundle.HelmSource, vm []servicebundle.ValueMappingItem
 	return result, nil
 }
 
-func claimPathToKCL(p string) (kcl.Ref, error) {
+func claimPathToKCL(p string) (kcl.RawKCL, error) {
 	if !strings.HasPrefix(p, ".") {
-		return kcl.Ref{}, fmt.Errorf("claim path must start with '.': %s", p)
+		return kcl.RawKCL{}, fmt.Errorf("claim path must start with '.': %s", p)
 	}
-	return kcl.Ref{Expr: "oxr" + p}, nil
+	return kcl.RawKCL{Expr: "oxr" + p}, nil
 }
 
 // setPath shallow-clones each map it descends through, then writes v at
 // the leaf. Sub-trees not on the path keep their original backing maps.
-func setPath(m map[string]any, path []string, v kcl.Ref) map[string]any {
+func setPath(m map[string]any, path []string, v kcl.RawKCL) map[string]any {
 	out := maps.Clone(m)
 	if out == nil {
 		out = map[string]any{}

@@ -8,13 +8,13 @@ import (
 )
 
 func TestEmit_RefPassthrough(t *testing.T) {
-	got, err := Emit(Ref{Expr: "oxr.spec.parameters.size.replicas"})
+	got, err := Emit(RawKCL{Expr: "oxr.spec.parameters.size.replicas"})
 	require.NoError(t, err)
 	assert.Equal(t, "oxr.spec.parameters.size.replicas", got)
 }
 
 func TestEmit_RefInsideMap(t *testing.T) {
-	in := map[string]any{"instances": Ref{Expr: "oxr.spec.x"}}
+	in := map[string]any{"instances": RawKCL{Expr: "oxr.spec.x"}}
 	got, err := Emit(in)
 	require.NoError(t, err)
 	assert.Equal(t, "{\n    instances = oxr.spec.x\n}", got)

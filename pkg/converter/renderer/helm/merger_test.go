@@ -48,7 +48,7 @@ func TestMergeValues_MappingOverwritesStatic(t *testing.T) {
 	got, err := MergeValues(h, vm)
 	require.NoError(t, err)
 	cluster := got["cluster"].(map[string]any)
-	assert.Equal(t, kcl.Ref{Expr: "oxr.spec.parameters.size.replicas"}, cluster["instances"])
+	assert.Equal(t, kcl.RawKCL{Expr: "oxr.spec.parameters.size.replicas"}, cluster["instances"])
 }
 
 func TestMergeValues_MappingCreatesPath(t *testing.T) {
@@ -60,7 +60,7 @@ func TestMergeValues_MappingCreatesPath(t *testing.T) {
 	require.NoError(t, err)
 	cluster := got["cluster"].(map[string]any)
 	storage := cluster["storage"].(map[string]any)
-	assert.Equal(t, kcl.Ref{Expr: "oxr.spec.parameters.size.disk"}, storage["size"])
+	assert.Equal(t, kcl.RawKCL{Expr: "oxr.spec.parameters.size.disk"}, storage["size"])
 }
 
 func TestMergeValues_TargetWithLeadingDotEquivalent(t *testing.T) {
@@ -71,7 +71,7 @@ func TestMergeValues_TargetWithLeadingDotEquivalent(t *testing.T) {
 	got, err := MergeValues(h, vm)
 	require.NoError(t, err)
 	cluster := got["cluster"].(map[string]any)
-	assert.Equal(t, kcl.Ref{Expr: "oxr.spec.x"}, cluster["instances"])
+	assert.Equal(t, kcl.RawKCL{Expr: "oxr.spec.x"}, cluster["instances"])
 }
 
 func TestMergeValues_ClaimPathMissingDotErrors(t *testing.T) {
@@ -99,8 +99,8 @@ func TestMergeValues_MultipleMappings(t *testing.T) {
 	got, err := MergeValues(h, vm)
 	require.NoError(t, err)
 	cluster := got["cluster"].(map[string]any)
-	assert.Equal(t, kcl.Ref{Expr: "oxr.spec.parameters.size.replicas"}, cluster["instances"])
+	assert.Equal(t, kcl.RawKCL{Expr: "oxr.spec.parameters.size.replicas"}, cluster["instances"])
 	storage := cluster["storage"].(map[string]any)
-	assert.Equal(t, kcl.Ref{Expr: "oxr.spec.parameters.size.disk"}, storage["size"])
+	assert.Equal(t, kcl.RawKCL{Expr: "oxr.spec.parameters.size.disk"}, storage["size"])
 	assert.Equal(t, "pg", got["fullnameOverride"])
 }
