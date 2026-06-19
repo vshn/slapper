@@ -53,14 +53,12 @@ func (s *ServiceBundleConverter) Convert(ctx context.Context) error {
 		s.OutputDir = "xpkg"
 	}
 
-	if s.StdlibSource == nil {
-		if s.serviceBundle == nil {
-			return ErrBundleNotLoaded
-		}
+	if s.serviceBundle == nil {
+		return ErrBundleNotLoaded
+	}
 
-		if err := s.validateBundle(); err != nil {
-			return err
-		}
+	if err := s.validateBundle(); err != nil {
+		return err
 	}
 
 	var xrdFragments map[string]any
