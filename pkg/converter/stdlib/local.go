@@ -32,9 +32,15 @@ func loadLocal(dir string) (*Manifest, fs.FS, error) {
 	}
 
 	for _, s := range m.Steps {
-		_, err := fs.Stat(fsys, s.InputFile)
-		if err != nil {
-			return nil, nil, fmt.Errorf("step %s inputFile %s: %w", s.Kind, s.InputFile, err)
+		if s.InputFile != "" {
+			if _, err := fs.Stat(fsys, s.InputFile); err != nil {
+				return nil, nil, fmt.Errorf("step %s inputFile %s: %w", s.Kind, s.InputFile, err)
+			}
+		}
+		for rt, path := range s.InputTemplates {
+			if _, err := fs.Stat(fsys, path); err != nil {
+				return nil, nil, fmt.Errorf("step %s inputTemplate %s path %s: %w", s.Kind, rt, path, err)
+			}
 		}
 	}
 

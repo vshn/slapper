@@ -30,6 +30,11 @@ claim:
   kind: Foo
   simpleSchema:
     instanceName: string | default="pg" description="instance display name"
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
+  chart: cluster
+  version: 0.4.0
 pipeline:
   - kind: provisioning
   - kind: networking
@@ -50,6 +55,11 @@ meta:
   stdlib: ghcr.io/vshn/stdlib
 claim:
   kind: Foo
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
+  chart: cluster
+  version: 0.4.0
 pipeline:
   - kind: provisioning
 `
@@ -119,6 +129,11 @@ meta:
   stdlib: ghcr.io/vshn/stdlib
 claim:
   kind: ""
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
+  chart: cluster
+  version: 0.4.0
 pipeline:
   - kind: provisioning
 `
@@ -135,7 +150,7 @@ pipeline:
 }
 
 func TestConvert_BuildCompositionError(t *testing.T) {
-	// Empty pipeline triggers BuildComposition error.
+	// Custom step without function.name triggers BuildComposition error.
 	bundle := `
 meta:
   name: pg
@@ -144,6 +159,14 @@ meta:
   stdlib: ghcr.io/vshn/stdlib
 claim:
   kind: Foo
+renderer:
+  type: helm
+  repository: https://charts.cnpg.io/
+  chart: cluster
+  version: 0.4.0
+pipeline:
+  - kind: provisioning
+  - kind: custom
 `
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -185,9 +208,10 @@ func TestServiceBundleConverter_Convert_WithLocalStdlib(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(compRaw), "krm.kcl.dev/v1alpha1")
 	assert.NotContains(t, string(compRaw), `data.content = "dummy"`, "dummy KCL leaked — should be stdlib KCL")
-	// Wait — the testdata stdlib also uses `data.content = "dummy"`. Pick a different sentinel:
-	// e.g. assert metadata.name lines exist for each kind:
-	for _, k := range []string{"provisioning", "networking", "backup", "monitoring", "maintenance"} {
+	// Provisioning uses the new helm-release template; assert its fingerprint.
+	assert.Contains(t, string(compRaw), "helm.m.crossplane.io/v1beta1")
+	// Non-provisioning steps keep the in-stdlib KCL sentinel: metadata.name = "<kind>".
+	for _, k := range []string{"networking", "backup", "monitoring", "maintenance"} {
 		assert.Contains(t, string(compRaw), `metadata.name = "`+k+`"`)
 	}
 

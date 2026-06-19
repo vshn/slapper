@@ -8,7 +8,8 @@ steps:
     function:
       name: xpkg.upbound.io/crossplane-contrib/function-kcl
       versionConstraint: ">=v0.10.0"
-    inputFile: templates/provisioning.kcl
+    inputTemplates:
+      helm: templates/provisioning-helm.yaml
   - kind: networking
     function:
       name: xpkg.upbound.io/crossplane-contrib/function-kcl

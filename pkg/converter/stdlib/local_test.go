@@ -41,7 +41,7 @@ apiVersion: slapper.appslap.io/v1alpha1
 kind: Stdlib
 metadata: {name: x, version: 0.0.1}
 steps:
-  - kind: provisioning
+  - kind: networking
     function: {name: function-kcl, versionConstraint: ">=v0.10"}
     inputFile: templates/missing.kcl
 `), 0o644))
@@ -62,4 +62,42 @@ schemaFragments: {size: schemas/missing.yaml}
 	_, _, err := Load(context.Background(), LocalSource(dir))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "schemas/missing.yaml")
+}
+
+func TestLoadLocal_MissingInputTemplatePath(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "stdlib.yaml"), []byte(`
+apiVersion: slapper.appslap.io/v1alpha1
+kind: Stdlib
+metadata: {name: t, version: 0.0.1}
+steps:
+  - kind: provisioning
+    function: {name: f}
+    inputTemplates:
+      helm: templates/missing.yaml
+`), 0o644))
+
+	_, _, err := loadLocal(dir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "inputTemplate")
+	assert.Contains(t, err.Error(), "helm")
+}
+
+func TestLoadLocal_InputTemplatePathPresent(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "templates"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "templates", "helm.yaml"), []byte("apiVersion: v1\nkind: ConfigMap\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "stdlib.yaml"), []byte(`
+apiVersion: slapper.appslap.io/v1alpha1
+kind: Stdlib
+metadata: {name: t, version: 0.0.1}
+steps:
+  - kind: provisioning
+    function: {name: f}
+    inputTemplates:
+      helm: templates/helm.yaml
+`), 0o644))
+
+	_, _, err := loadLocal(dir)
+	require.NoError(t, err)
 }

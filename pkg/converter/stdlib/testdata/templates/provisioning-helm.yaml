@@ -1,0 +1,27 @@
+apiVersion: krm.kcl.dev/v1alpha1
+kind: KCLInput
+metadata:
+  name: helm-release
+spec:
+  source: |
+    oxr = option("params").oxr
+    release = {
+      apiVersion = "helm.m.crossplane.io/v1beta1"
+      kind       = "Release"
+      metadata.name = oxr.metadata.name
+      # In prod, there's probably
+      # function-auto-ready
+      metadata.annotations: {
+         "krm.kcl.dev/ready": "True"
+      }
+      spec.forProvider = {
+        chart = {
+          repository = {$slapperRef: renderer.spec.repository.kcl}
+          name       = {$slapperRef: renderer.spec.chart.kcl}
+          version    = {$slapperRef: renderer.spec.version.kcl}
+        }
+        skipCreateNamespace: True
+        values = {$slapperRef: renderer.values.kcl}
+      }
+    }
+    items = [release]

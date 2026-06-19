@@ -12,8 +12,8 @@ import (
 )
 
 func TestRegisterAll_OverridesInTreeDummies(t *testing.T) {
-	pipeline.ResetForTest()            // helper to be added — see Step 4
-	pipeline.RegisterDefaultsForTest() // helper to be added — see Step 4
+	pipeline.ResetForTest()
+	pipeline.RegisterDefaultsForTest()
 
 	beforeR, ok := pipeline.Get(servicebundle.StepProvisioning)
 	require.True(t, ok, "in-tree dummy should be registered")
@@ -22,7 +22,8 @@ func TestRegisterAll_OverridesInTreeDummies(t *testing.T) {
 	m, files, err := Load(context.Background(), LocalSource("testdata"))
 	require.NoError(t, err)
 
-	require.NoError(t, RegisterAll(m, files))
+	bundle := minimalHelmBundle()
+	require.NoError(t, RegisterAll(m, files, bundle))
 
 	afterR, ok := pipeline.Get(servicebundle.StepProvisioning)
 	require.True(t, ok)
@@ -32,18 +33,16 @@ func TestRegisterAll_OverridesInTreeDummies(t *testing.T) {
 
 func TestRegisterAll_RegistersAllKinds(t *testing.T) {
 	pipeline.ResetForTest()
+	pipeline.RegisterDefaultsForTest()
+
 	m, files, err := Load(context.Background(), LocalSource("testdata"))
 	require.NoError(t, err)
-	require.NoError(t, RegisterAll(m, files))
 
-	for _, kind := range []servicebundle.PipelineStepKind{
-		servicebundle.StepProvisioning,
-		servicebundle.StepNetworking,
-		servicebundle.StepBackup,
-		servicebundle.StepMonitoring,
-		servicebundle.StepMaintenance,
-	} {
-		_, ok := pipeline.Get(kind)
-		assert.True(t, ok, "kind %s not registered", kind)
+	bundle := minimalHelmBundle()
+	require.NoError(t, RegisterAll(m, files, bundle))
+
+	for _, s := range m.Steps {
+		_, ok := pipeline.Get(s.Kind)
+		assert.True(t, ok, "kind %s not registered", s.Kind)
 	}
 }

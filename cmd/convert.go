@@ -10,6 +10,7 @@ import (
 
 	"github.com/vshn/slapper/pkg/converter"
 	"github.com/vshn/slapper/pkg/converter/stdlib"
+	"github.com/vshn/slapper/pkg/servicebundle"
 )
 
 type convertOpts struct {
@@ -59,7 +60,7 @@ func runConvert(ctx context.Context, opts *convertOpts, args []string) error {
 		return err
 	}
 
-	c.StdlibSource = resolveStdlibSource(opts, c.Meta().Stdlib)
+	c.StdlibSource = resolveStdlibSource(opts, c.Meta().Stdlib, c.Renderer())
 
 	return c.Convert(ctx)
 }
@@ -68,11 +69,14 @@ func runConvert(ctx context.Context, opts *convertOpts, args []string) error {
 // Precedence: --no-stdlib > --stdlib-path > meta.stdlib > none.
 // Warns when --no-stdlib suppresses a bundle-declared stdlib so the maintainer
 // notices that the emitted package omits the Configuration meta.
-func resolveStdlibSource(opts *convertOpts, metaStdlib string) stdlib.Source {
+func resolveStdlibSource(opts *convertOpts, metaStdlib string, renderer *servicebundle.Renderer) stdlib.Source {
 	switch {
 	case opts.noStdlib:
 		if metaStdlib != "" {
 			slog.Warn("--no-stdlib set; ignoring meta.stdlib from bundle", "stdlib", metaStdlib)
+		}
+		if renderer != nil {
+			slog.Warn("--no-stdlib: renderer ignored", "type", string(renderer.Type))
 		}
 		return nil
 	case opts.stdlibPath != "":

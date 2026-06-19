@@ -64,7 +64,7 @@ func populateSteps(sb *servicebundle.ServiceBundle) ([]any, error) {
 
 		slog.Debug("rendering pipeline step", "step", i, "kind", step.Kind)
 
-		entry, err := r.Render(step)
+		entry, err := r.Render(step, i)
 		if err != nil {
 			return nil, fmt.Errorf("step %d (%s): %w", i, step.Kind, err)
 		}

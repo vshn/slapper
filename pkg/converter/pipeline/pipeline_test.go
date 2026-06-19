@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -17,7 +18,7 @@ type fakeRenderer struct {
 }
 
 func (f fakeRenderer) Kind() servicebundle.PipelineStepKind { return f.kind }
-func (f fakeRenderer) Render(_ servicebundle.PipelineStep) (map[string]any, error) {
+func (f fakeRenderer) Render(_ servicebundle.PipelineStep, _ int) (map[string]any, error) {
 	return map[string]any{"step": string(f.kind)}, nil
 }
 
@@ -55,10 +56,10 @@ func TestRegistry_RegisterOverwrites(t *testing.T) {
 
 func TestBuiltinRenderer_Render(t *testing.T) {
 	r := dummyRenderer{kind: servicebundle.StepProvisioning}
-	got, err := r.Render(servicebundle.PipelineStep{Kind: servicebundle.StepProvisioning})
+	got, err := r.Render(servicebundle.PipelineStep{Kind: servicebundle.StepProvisioning}, 0)
 	require.NoError(t, err)
 
-	assert.Equal(t, "provisioning", got["step"])
+	assert.Equal(t, "provisioning-0", got["step"])
 
 	fn, ok := got["functionRef"].(map[string]any)
 	require.True(t, ok, "functionRef not a map")
@@ -89,10 +90,10 @@ func TestCustomRenderer_PassThrough(t *testing.T) {
 			},
 		},
 	}
-	got, err := customRenderer{}.Render(step)
+	got, err := customRenderer{}.Render(step, 0)
 	require.NoError(t, err)
 
-	assert.Equal(t, "custom", got["step"])
+	assert.Equal(t, "custom-0", got["step"])
 
 	fn := got["functionRef"].(map[string]any)
 	assert.Equal(t, "function-python", fn["name"])
@@ -107,7 +108,7 @@ func TestCustomRenderer_WrongSpecType(t *testing.T) {
 		Kind: servicebundle.StepCustom,
 		Spec: &servicebundle.ProvisioningStep{},
 	}
-	_, err := customRenderer{}.Render(step)
+	_, err := customRenderer{}.Render(step, 0)
 	assert.Error(t, err, "expected error for wrong spec type")
 }
 
@@ -116,7 +117,7 @@ func TestCustomRenderer_MissingFunction(t *testing.T) {
 		Kind: servicebundle.StepCustom,
 		Spec: &servicebundle.CustomStep{Function: servicebundle.FuncRef{}},
 	}
-	_, err := customRenderer{}.Render(step)
+	_, err := customRenderer{}.Render(step, 0)
 	assert.Error(t, err, "expected error for empty function.name")
 }
 
@@ -243,12 +244,12 @@ func TestBuildComposition_AllKinds(t *testing.T) {
 		stepName string
 		fnName   string
 	}{
-		{"provisioning", "function-kcl"},
-		{"networking", "function-kcl"},
-		{"backup", "function-kcl"},
-		{"monitoring", "function-kcl"},
-		{"maintenance", "function-kcl"},
-		{"custom", "function-python"},
+		{"provisioning-0", "function-kcl"},
+		{"networking-1", "function-kcl"},
+		{"backup-2", "function-kcl"},
+		{"monitoring-3", "function-kcl"},
+		{"maintenance-4", "function-kcl"},
+		{"custom-5", "function-python"},
 	}
 	for i, w := range want {
 		entry := pipe[i].(map[string]any)
@@ -309,6 +310,6 @@ func TestExampleBundle_BuildsComposition(t *testing.T) {
 
 	for i, step := range sb.Pipeline {
 		entry := pipe[i].(map[string]any)
-		assert.Equal(t, string(step.Kind), entry["step"], "pipe[%d].step", i)
+		assert.Equal(t, fmt.Sprintf("%s-%d", step.Kind, i), entry["step"], "pipe[%d].step", i)
 	}
 }

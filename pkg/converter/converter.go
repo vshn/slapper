@@ -36,6 +36,15 @@ func (s *ServiceBundleConverter) Meta() servicebundle.Meta {
 	return s.serviceBundle.Meta
 }
 
+// Renderer returns the loaded renderer block. Returns nil if no
+// bundle has been loaded yet -> callers should LoadBundle first.
+func (s *ServiceBundleConverter) Renderer() *servicebundle.Renderer {
+	if s.serviceBundle == nil {
+		return nil
+	}
+	return s.serviceBundle.Renderer
+}
+
 // Convert converts the loaded bundle into a Crossplane package. The context
 // is forwarded to the stdlib loader so OCI pulls honour cancellation /
 // deadlines from the caller (e.g. cobra's cmd.Context()).
@@ -48,6 +57,10 @@ func (s *ServiceBundleConverter) Convert(ctx context.Context) error {
 		return ErrBundleNotLoaded
 	}
 
+	if err := s.validateBundle(); err != nil {
+		return err
+	}
+
 	var xrdFragments map[string]any
 	if s.StdlibSource != nil {
 		m, files, err := stdlib.Load(ctx, s.StdlibSource)
@@ -55,7 +68,7 @@ func (s *ServiceBundleConverter) Convert(ctx context.Context) error {
 			return fmt.Errorf("loading stdlib: %w", err)
 		}
 
-		err = stdlib.RegisterAll(m, files)
+		err = stdlib.RegisterAll(m, files, s.serviceBundle)
 		if err != nil {
 			return fmt.Errorf("registering stdlib: %w", err)
 		}
@@ -176,6 +189,29 @@ func (s *ServiceBundleConverter) LoadBundle(path string) error {
 		attrs = append(attrs, "rendererType", string(sb.Renderer.Type))
 	}
 	slog.Info("loaded bundle", attrs...)
+
+	return nil
+}
+
+func (s *ServiceBundleConverter) validateBundle() error {
+	if s.serviceBundle.Renderer == nil {
+		return fmt.Errorf("bundle.renderer is required")
+	}
+
+	if err := s.serviceBundle.Renderer.Validate(); err != nil {
+		return fmt.Errorf("bundle.renderer: %w", err)
+	}
+
+	provisioningCount := 0
+	for _, step := range s.serviceBundle.Pipeline {
+		if step.Kind == servicebundle.StepProvisioning {
+			provisioningCount++
+		}
+	}
+
+	if provisioningCount != 1 {
+		return fmt.Errorf("pipeline must contain exactly one provisioning step, found: %d", provisioningCount)
+	}
 
 	return nil
 }

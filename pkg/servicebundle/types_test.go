@@ -349,3 +349,72 @@ credentials:
 	assert.Equal(t, CredSourceExpr, host.Source)
 	assert.NotEmpty(t, host.Spec.(*CredExpr).Expression)
 }
+
+// ----- Renderer / HelmSource Validate -----
+
+func TestHelmSource_Validate_OK(t *testing.T) {
+	h := HelmSource{Repository: "r", Chart: "c", Version: "v"}
+	assert.NoError(t, h.Validate())
+}
+
+func TestHelmSource_Validate_MissingRepository(t *testing.T) {
+	h := HelmSource{Chart: "c", Version: "v"}
+	err := h.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "repository")
+}
+
+func TestHelmSource_Validate_MissingChart(t *testing.T) {
+	h := HelmSource{Repository: "r", Version: "v"}
+	err := h.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "chart")
+}
+
+func TestHelmSource_Validate_MissingVersion(t *testing.T) {
+	h := HelmSource{Repository: "r", Chart: "c"}
+	err := h.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "version")
+}
+
+func TestHelmSource_Validate_AllMissingReportsAll(t *testing.T) {
+	h := HelmSource{}
+	err := h.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "repository")
+	assert.Contains(t, err.Error(), "chart")
+	assert.Contains(t, err.Error(), "version")
+}
+
+func TestRenderer_Validate_Helm_OK(t *testing.T) {
+	r := &Renderer{
+		Type: RendererTypeHelm,
+		Spec: &HelmSource{Repository: "r", Chart: "c", Version: "v"},
+	}
+	assert.NoError(t, r.Validate())
+}
+
+func TestRenderer_Validate_Helm_DelegatesToSpec(t *testing.T) {
+	r := &Renderer{
+		Type: RendererTypeHelm,
+		Spec: &HelmSource{},
+	}
+	err := r.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "repository")
+}
+
+func TestRenderer_Validate_UnknownTypeErrors(t *testing.T) {
+	r := &Renderer{Type: RendererType("nope"), Spec: nil}
+	err := r.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nope")
+}
+
+func TestRenderer_Validate_SpecTypeMismatch(t *testing.T) {
+	// Type says helm but Spec is plain_manifests.
+	r := &Renderer{Type: RendererTypeHelm, Spec: &PlainManifestsSource{}}
+	err := r.Validate()
+	require.Error(t, err)
+}

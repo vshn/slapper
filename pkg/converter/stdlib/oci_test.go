@@ -30,7 +30,7 @@ func TestOCISource_Load_FromRegistry(t *testing.T) {
 	require.NotNil(t, m)
 	assert.Equal(t, "test-stdlib", m.Metadata.Name)
 
-	f, err := files.Open("templates/provisioning.kcl")
+	f, err := files.Open("templates/provisioning-helm.yaml")
 	require.NoError(t, err)
 	defer f.Close()
 }

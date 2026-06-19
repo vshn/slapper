@@ -1,6 +1,10 @@
 # ServiceLayer AppCat Pipeline Package Emission Renderer (Slapper)
 
-It slaps your service into AppCat form!
+
+<p align="center">
+  <img width=512px src="./assets/slap.png" alt="Batman slapping Robin meme" /><br />
+<i>It slaps your service into AppCat form!</i>
+</p>
 
 ## What?!
 
@@ -25,6 +29,86 @@ Different stdlib can be used depending on the customer or platform.
 This allows for abstracting the service specifics from the platform and customer specifics.
 A service maintainer doesn't have to ask: "do I need an ingress or gateway manifest?" they only need to specify
 how the service should get exposed, the rest is handled by the stdlib.
+
+## Getting started
+
+On a fresh kindev cluster:
+
+- Install Crossplane
+- Install CloudNativePG
+- Install the necessary providers and functions
+- Generate the example
+- Apply it
+
+### 1. Install Crossplane
+
+```sh
+helm repo add crossplane-stable https://charts.crossplane.io/stable
+helm repo update
+helm install crossplane crossplane-stable/crossplane \
+  --namespace crossplane-system --create-namespace \
+```
+
+Wait until the deployment is ready:
+
+```sh
+kubectl -n crossplane-system rollout status deploy/crossplane
+```
+
+### 2. Install CloudNativePG
+
+The PostgreSQL example depends on the CloudNativePG operator.
+
+```sh
+helm repo add cnpg https://cloudnative-pg.github.io/charts
+helm repo update
+helm install cnpg cnpg/cloudnative-pg \
+  --namespace cnpg-system --create-namespace
+```
+
+Wait until the operator is ready:
+
+```sh
+kubectl -n cnpg-system rollout status deploy/cnpg-cloudnative-pg
+```
+
+### 3. Render the example bundle
+
+```sh
+make build
+./slap examples/servicebundle.yaml -p pkg/converter/stdlib/testdata
+```
+
+This populates `xpkg/` with `xrd.yaml` and `composition.yaml`.
+
+### 4. Install dependencies + generated package
+
+Install all dependencies.
+
+```sh
+kubectl apply -f examples/bootstrap/
+kubectl wait --for=create crd/clusterproviderconfigs.helm.m.crossplane.io
+kubectl apply -f examples/bootstrap/
+kubectl apply -f xpkg/xrd.yaml -f xpkg/composition.yaml
+```
+
+> RBAC for provider-helm will be cluster-admin, don't use this in
+> production.
+
+Wait for the packages to become healthy:
+
+```sh
+kubectl wait --for=condition=Healthy provider/provider-helm --timeout=5m
+kubectl wait --for=condition=Healthy function/function-kcl --timeout=5m
+kubectl wait --for=condition=Healthy function/function-python --timeout=5m
+```
+
+### 5. Create an instance
+
+```sh
+kubectl apply -f examples/xvshnpostgresql.yaml
+kubectl get xvshnpostgresql my-pg -w
+```
 
 ## Stdlib resolution
 

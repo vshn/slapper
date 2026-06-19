@@ -1,0 +1,43 @@
+---
+# DeploymentRuntimeConfig pins the controller's ServiceAccount name so the
+# ClusterRoleBinding below can target it.
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: provider-helm-cluster-admin
+spec:
+  serviceAccountTemplate:
+    metadata:
+      name: provider-helm-sa
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-helm
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
+  runtimeConfigRef:
+    name: provider-helm-cluster-admin
+---
+# Grant the provider-helm controller cluster-admin so it can install arbitrary
+# charts (CRDs, RBAC, namespaced workloads). Tighten in production.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: provider-helm-cluster-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: provider-helm-sa
+    namespace: crossplane-system
+---
+apiVersion: helm.m.crossplane.io/v1beta1
+kind: ClusterProviderConfig
+metadata:
+  name: default
+spec:
+  credentials:
+    source: InjectedIdentity

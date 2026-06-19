@@ -31,9 +31,10 @@ type ManifestMeta struct {
 
 // StepEntry contains the schema for a single step.
 type StepEntry struct {
-	Kind      servicebundle.PipelineStepKind `json:"kind"`
-	Function  FunctionRef                    `json:"function"`
-	InputFile string                         `json:"inputFile"`
+	Kind           servicebundle.PipelineStepKind `json:"kind"`
+	Function       FunctionRef                    `json:"function"`
+	InputFile      string                         `json:"inputFile"`
+	InputTemplates map[string]string              `json:"inputTemplates"`
 }
 
 // FunctionRef schema for the function reference
@@ -63,15 +64,27 @@ func (m *Manifest) Validate() error {
 
 	seen := map[servicebundle.PipelineStepKind]bool{}
 	for _, step := range m.Steps {
-		if _, ok := seen[step.Kind]; ok {
+		if seen[step.Kind] {
 			return fmt.Errorf("duplicate step kind detected: %s", step.Kind)
 		}
 		seen[step.Kind] = true
-	}
 
-	for _, step := range m.Steps {
 		if step.Function.Name == "" {
 			return fmt.Errorf("step %s: function.name is required", step.Kind)
+		}
+
+		hasFile := step.InputFile != ""
+		hasTpls := len(step.InputTemplates) > 0
+
+		if hasFile == hasTpls {
+			return fmt.Errorf("step %s: exactly one of inputFile or inputTemplates must be set", step.Kind)
+		}
+
+		if step.Kind == servicebundle.StepProvisioning && hasFile {
+			return fmt.Errorf("step %s: must use inputTemplates (not inputFile)", step.Kind)
+		}
+		if step.Kind != servicebundle.StepProvisioning && hasTpls {
+			return fmt.Errorf("step %s: must use inputFile (not inputTemplates)", step.Kind)
 		}
 	}
 
